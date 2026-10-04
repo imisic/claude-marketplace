@@ -1,0 +1,5 @@
+interface:
+  display_name: "Rules Optimizer"
+  short_description: "Audit and update project rules and CLAUDE.md"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Testing lens"
+  short_description: "Check whether tests catch broken behaviour, and identify missing assertions and failure cases."
+policy:
+  allow_implicit_invocation: false

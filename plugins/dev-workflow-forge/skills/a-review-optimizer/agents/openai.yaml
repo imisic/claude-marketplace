@@ -1,0 +1,5 @@
+interface:
+  display_name: "Review Optimizer"
+  short_description: "Create or improve a project code review skill"
+policy:
+  allow_implicit_invocation: false

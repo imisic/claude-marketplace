@@ -1,0 +1,5 @@
+interface:
+  display_name: "Architect lens"
+  short_description: "Compare system designs and recommend an approach based on constraints and tradeoffs."
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Sanitize Public"
+  short_description: "Leak scan before anything ships publicly"

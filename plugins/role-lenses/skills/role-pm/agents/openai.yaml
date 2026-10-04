@@ -1,0 +1,5 @@
+interface:
+  display_name: "PM lens"
+  short_description: "Assess a product idea: who it serves, whether to build it, and what to leave out."
+policy:
+  allow_implicit_invocation: false

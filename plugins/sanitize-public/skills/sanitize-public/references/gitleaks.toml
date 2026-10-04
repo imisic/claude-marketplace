@@ -1,0 +1,13 @@
+# gitleaks config for publish_gate.sh: the default ruleset plus the false
+# positives that were reviewed and found to be prose, not secrets. Each entry
+# needs the reason, because an allowlist nobody can explain is a blind spot.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "reviewed false positives"
+regexes = [
+  # A review checklist line naming password-hashing algorithms. generic-api-key
+  # reads "bcrypt/argon2" as a high-entropy token.
+  '''^bcrypt/argon2$''',
+]

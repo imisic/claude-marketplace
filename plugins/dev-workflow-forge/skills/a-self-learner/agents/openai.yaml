@@ -1,0 +1,5 @@
+interface:
+  display_name: "Self Learner"
+  short_description: "Propose rule and review skill updates from findings"
+policy:
+  allow_implicit_invocation: false

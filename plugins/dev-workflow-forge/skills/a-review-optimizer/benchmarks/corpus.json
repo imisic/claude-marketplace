@@ -1,0 +1,676 @@
+{
+  "schema": 1,
+  "built": "2026-08-29",
+  "purpose": "Seeded-defect corpus for a-review-optimizer. Every entry is a pattern that really recurred in a reviewed codebase rather than a textbook example, which is what makes a recall number mean anything. Build your own with: seed-defects.py --build-corpus",
+  "sources": {
+    "note": "Built from this fleet's own review logs. Project identity, file paths and dates are deliberately not recorded: the corpus travels, and a defect list naming real files in real sites is not something to hand around.",
+    "logs_read": 6,
+    "rows_read": 2014
+  },
+  "selection": "Categories that recurred across multiple files and multiple run dates were preferred; severity and dimension spread was balanced afterwards. Whitelisted rows and preflight false positives are excluded from the recurrence counts, and any category whose every logged instance was a false positive was dropped: seeding one would train the reviewer to flag what the project already ruled acceptable.",
+  "defects": [
+    {
+      "id": "php-01",
+      "stack": "php",
+      "category": "wrong-array-key-silent-fallback",
+      "severity": "high",
+      "dimension": "quality",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 21,
+        "files": 11,
+        "run_dates": 8,
+        "whitelisted_in_log": 0
+      },
+      "description": "Reads an array key the SELECT never fetched, so the ?? fallback is permanent and silent.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchNotificationLanguage(\\PDO $db, int $userId): string",
+          "{",
+          "    $stmt = $db->prepare('SELECT id, email, name FROM users WHERE id = ?');",
+          "    $stmt->execute([$userId]);",
+          "    $user = $stmt->fetch(\\PDO::FETCH_ASSOC);",
+          "    if ($user === false) {",
+          "        return 'hr';",
+          "    }",
+          "",
+          "    return $user['preferred_language'] ?? 'hr';",
+          "}"
+        ],
+        "defect_line": 10,
+        "defect_anchor": "return $user['preferred_language']"
+      }
+    },
+    {
+      "id": "php-02",
+      "stack": "php",
+      "category": "ratelimit-mutations",
+      "severity": "medium",
+      "dimension": "security",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 19,
+        "files": 8,
+        "run_dates": 6,
+        "whitelisted_in_log": 0
+      },
+      "description": "State-changing endpoint with no rate-limit check and no recorded hit.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchPinAdminNote(\\PDO $db, int $noteId, int $adminId): array",
+          "{",
+          "    $stmt = $db->prepare('UPDATE admin_notes SET pinned = 1, pinned_by = ? WHERE id = ?');",
+          "    $stmt->execute([$adminId, $noteId]);",
+          "",
+          "    return [",
+          "        'success' => true,",
+          "        'note_id' => $noteId,",
+          "    ];",
+          "}"
+        ],
+        "defect_line": 3,
+        "defect_anchor": "$stmt = $db->prepare('UPDATE admin_notes"
+      }
+    },
+    {
+      "id": "php-03",
+      "stack": "php",
+      "category": "toctou-filesystem",
+      "severity": "medium",
+      "dimension": "architecture",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 28,
+        "files": 7,
+        "run_dates": 8,
+        "whitelisted_in_log": 0
+      },
+      "description": "check-then-act on the filesystem: file_exists guard before the read it is supposed to protect.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchReadOgCacheHash(string $cachePath): ?string",
+          "{",
+          "    if (file_exists($cachePath)) {",
+          "        $hash = file_get_contents($cachePath);",
+          "        if ($hash !== false) {",
+          "            return trim($hash);",
+          "        }",
+          "    }",
+          "",
+          "    return null;",
+          "}"
+        ],
+        "defect_line": 3,
+        "defect_anchor": "if (file_exists($cachePath))"
+      }
+    },
+    {
+      "id": "php-04",
+      "stack": "php",
+      "category": "n-plus-one-in-loop",
+      "severity": "medium",
+      "dimension": "performance",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 7,
+        "files": 5,
+        "run_dates": 5,
+        "whitelisted_in_log": 0
+      },
+      "description": "One query per loop iteration where a single WHERE id IN (...) would do.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchResolveImportSlugs(\\PDO $db, array $items): array",
+          "{",
+          "    $resolved = [];",
+          "    foreach ($items as $item) {",
+          "        $stmt = $db->prepare('SELECT id FROM blog_posts WHERE slug = ? LIMIT 1');",
+          "        $stmt->execute([$item['slug']]);",
+          "        $row = $stmt->fetch(\\PDO::FETCH_ASSOC);",
+          "        $resolved[$item['slug']] = $row !== false ? (int) $row['id'] : null;",
+          "    }",
+          "",
+          "    return $resolved;",
+          "}"
+        ],
+        "defect_line": 5,
+        "defect_anchor": "$stmt = $db->prepare('SELECT id FROM blog_posts"
+      }
+    },
+    {
+      "id": "php-05",
+      "stack": "php",
+      "category": "unbounded-query-no-limit",
+      "severity": "medium",
+      "dimension": "quality",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 7,
+        "files": 6,
+        "run_dates": 4,
+        "whitelisted_in_log": 0
+      },
+      "description": "SELECT over a growing table with no LIMIT, fed straight into an in-memory array.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchAllPublishedGuides(\\PDO $db): array",
+          "{",
+          "    $stmt = $db->query(\"SELECT id, slug, updated_at FROM guides WHERE status = 'published' ORDER BY updated_at DESC\");",
+          "",
+          "    return $stmt->fetchAll(\\PDO::FETCH_ASSOC);",
+          "}"
+        ],
+        "defect_line": 3,
+        "defect_anchor": "$stmt = $db->query("
+      }
+    },
+    {
+      "id": "php-06",
+      "stack": "php",
+      "category": "split-transaction-orphaned-state",
+      "severity": "medium",
+      "dimension": "architecture",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 15,
+        "files": 6,
+        "run_dates": 5,
+        "whitelisted_in_log": 0
+      },
+      "description": "Two writes that must land together are committed in separate transactions; a crash between them orphans state.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchQueueAndScheduleBatch(\\PDO $db, int $batchId, string $sendAt): bool",
+          "{",
+          "    $db->beginTransaction();",
+          "    $stmt = $db->prepare(\"UPDATE outreach_batches SET status = 'queued' WHERE id = ?\");",
+          "    $stmt->execute([$batchId]);",
+          "    $db->commit();",
+          "",
+          "    $db->beginTransaction();",
+          "    $sched = $db->prepare('UPDATE outreach_batches SET scheduled_at = ? WHERE id = ?');",
+          "    $sched->execute([$sendAt, $batchId]);",
+          "    $db->commit();",
+          "",
+          "    return true;",
+          "}"
+        ],
+        "defect_line": 9,
+        "defect_anchor": "$sched = $db->prepare("
+      }
+    },
+    {
+      "id": "php-07",
+      "stack": "php",
+      "category": "innerhtml-external-data",
+      "severity": "medium",
+      "dimension": "security",
+      "target_ext": ".js",
+      "recurrence": {
+        "findings": 6,
+        "files": 5,
+        "run_dates": 3,
+        "whitelisted_in_log": 0
+      },
+      "description": "API-sourced value concatenated into innerHTML without escaping or createElement.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchRenderAttachmentCard(container, post) {",
+          "    if (!post || !post.attachment) {",
+          "        return;",
+          "    }",
+          "    container.innerHTML = '<a class=\"attachment\" href=\"' + post.attachment + '\">' + post.title + '</a>';",
+          "}"
+        ],
+        "defect_line": 5,
+        "defect_anchor": "container.innerHTML ="
+      }
+    },
+    {
+      "id": "php-08",
+      "stack": "php",
+      "category": "request-value-without-type-guard",
+      "severity": "low",
+      "dimension": "security",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 6,
+        "files": 5,
+        "run_dates": 4,
+        "whitelisted_in_log": 0
+      },
+      "description": "Raw superglobal value passed into a string-typed sink; an array-shaped param fatals instead of validating.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchMediaSearchTerm(): string",
+          "{",
+          "    $search = $_GET['search'] ?? '';",
+          "",
+          "    return substr(trim($search), 0, 120);",
+          "}"
+        ],
+        "defect_line": 3,
+        "defect_anchor": "$search = $_GET['search']"
+      }
+    },
+    {
+      "id": "php-09",
+      "stack": "php",
+      "category": "stringly-typed-status-literal",
+      "severity": "low",
+      "dimension": "quality",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 21,
+        "files": 16,
+        "run_dates": 10,
+        "whitelisted_in_log": 0
+      },
+      "description": "Raw status string literals on the read side while the project ships a backing enum used on the write side.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchIcalStatusLine(array $event): string",
+          "{",
+          "    $status = $event['status'] ?? 'draft';",
+          "    if ($status === 'scheduled' || $status === 'published') {",
+          "        return 'STATUS:CONFIRMED';",
+          "    }",
+          "",
+          "    return 'STATUS:TENTATIVE';",
+          "}"
+        ],
+        "defect_line": 4,
+        "defect_anchor": "if ($status === 'scheduled'"
+      }
+    },
+    {
+      "id": "php-10",
+      "stack": "php",
+      "category": "phpstan-mixed-cast-array-string-mixed",
+      "severity": "high",
+      "dimension": "quality",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 12,
+        "files": 4,
+        "run_dates": 4,
+        "whitelisted_in_log": 0
+      },
+      "description": "Bare (string)/(int) casts of mixed read out of an untyped array parameter; fails PHPStan level 9.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "/**",
+          " * @param array<string, mixed> $user",
+          " */",
+          "function benchUnsubscribeLine(array $user): string",
+          "{",
+          "    return (string) $user['email'] . ' | ' . (string) $user['preferred_language'] . ' | ' . (int) $user['id'];",
+          "}"
+        ],
+        "defect_line": 6,
+        "defect_anchor": "return (string) $user['email']"
+      }
+    },
+    {
+      "id": "php-11",
+      "stack": "php",
+      "category": "dead-assignment",
+      "severity": "info",
+      "dimension": "quality",
+      "target_ext": ".php",
+      "recurrence": {
+        "findings": 4,
+        "files": 4,
+        "run_dates": 4,
+        "whitelisted_in_log": 0
+      },
+      "description": "Variable assigned then unconditionally overwritten before any read; refactor leftover.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "function benchReadCounterFile(string $path): string",
+          "{",
+          "    $content = false;",
+          "    $content = @file_get_contents($path);",
+          "",
+          "    return $content === false ? '' : $content;",
+          "}"
+        ],
+        "defect_line": 3,
+        "defect_anchor": "$content = false;"
+      }
+    },
+    {
+      "id": "py-01",
+      "stack": "python",
+      "category": "pii-in-logs",
+      "severity": "high",
+      "dimension": "security",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 26,
+        "files": 16,
+        "run_dates": 2,
+        "whitelisted_in_log": 0
+      },
+      "description": "Exception object passed straight into a log call, re-leaking the path the redaction above just scrubbed.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_prune_expired_export(path):",
+          "    import logging",
+          "    import os",
+          "",
+          "    log = logging.getLogger(__name__)",
+          "    safe = str(path)[:8]",
+          "    try:",
+          "        os.remove(path)",
+          "    except OSError as exc:",
+          "        log.warning(\"export prune failed for %s: %s\", safe, exc)",
+          "        return False",
+          "    return True"
+        ],
+        "defect_line": 10,
+        "defect_anchor": "log.warning("
+      }
+    },
+    {
+      "id": "py-02",
+      "stack": "python",
+      "category": "swallowed-exception",
+      "severity": "medium",
+      "dimension": "architecture",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 2,
+        "files": 2,
+        "run_dates": 2,
+        "whitelisted_in_log": 0
+      },
+      "description": "Broad except returning a default with no log line and no suppression marker, so a real crash reads as a normal miss.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_looks_like_spa_shell(html):",
+          "    try:",
+          "        body = html.split(\"<body\", 1)[1]",
+          "        return len(body) < 512",
+          "    except Exception:",
+          "        return False"
+        ],
+        "defect_line": 5,
+        "defect_anchor": "except Exception:"
+      }
+    },
+    {
+      "id": "py-03",
+      "stack": "python",
+      "category": "ssrf-gate-bypass",
+      "severity": "high",
+      "dimension": "security",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 3,
+        "files": 3,
+        "run_dates": 1,
+        "whitelisted_in_log": 15
+      },
+      "description": "URL gate applied to the initial URL only; redirects are followed and the final URL is read without re-validation.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_fetch_candidate_body(session, url):",
+          "    if not is_safe_url(url):",
+          "        return \"\"",
+          "    resp = session.get(url, allow_redirects=True, timeout=15)",
+          "    if resp.status_code != 200:",
+          "        return \"\"",
+          "    final_url = str(resp.url)",
+          "    if len(final_url) > 2048:",
+          "        return \"\"",
+          "    return resp.text"
+        ],
+        "defect_line": 10,
+        "defect_anchor": "return resp.text"
+      }
+    },
+    {
+      "id": "py-04",
+      "stack": "python",
+      "category": "case-collision-filename",
+      "severity": "medium",
+      "dimension": "platform",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 2,
+        "files": 2,
+        "run_dates": 2,
+        "whitelisted_in_log": 0
+      },
+      "description": "Filename built from raw user text with no case-fold disambiguator, so two titles differing only in case collide on Windows and macOS.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_destination_name(root, title):",
+          "    from pathlib import Path",
+          "",
+          "    safe = \"\".join(ch for ch in title if ch.isalnum() or ch in \" -_\").strip()",
+          "    return Path(root) / f\"{safe}.csv\""
+        ],
+        "defect_line": 5,
+        "defect_anchor": "return Path(root) / f\"{safe}.csv\""
+      }
+    },
+    {
+      "id": "py-05",
+      "stack": "python",
+      "category": "unsafe-external-dict-access",
+      "severity": "medium",
+      "dimension": "quality",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 2,
+        "files": 2,
+        "run_dates": 1,
+        "whitelisted_in_log": 0
+      },
+      "description": "Externally written JSON indexed without any shape check, so a valid-but-wrong-shaped file raises instead of degrading.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_load_price_tiers(path):",
+          "    import json",
+          "",
+          "    with open(path, encoding=\"utf-8\") as fh:",
+          "        data = json.load(fh)",
+          "",
+          "    return {entry[\"name\"]: entry[\"rate\"] for entry in data[\"tiers\"]}"
+        ],
+        "defect_line": 7,
+        "defect_anchor": "return {entry[\"name\"]"
+      }
+    },
+    {
+      "id": "py-06",
+      "stack": "python",
+      "category": "atomic-write-bypass",
+      "severity": "low",
+      "dimension": "security",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 1,
+        "files": 1,
+        "run_dates": 1,
+        "whitelisted_in_log": 0
+      },
+      "description": "Direct write_text into a user-visible store where the project ships an atomic writer; a crash mid-write truncates the file.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_export_invoice(body, destination):",
+          "    from pathlib import Path",
+          "",
+          "    target = Path(destination)",
+          "    target.parent.mkdir(parents=True, exist_ok=True)",
+          "    target.write_text(body, encoding=\"utf-8\")",
+          "    return target"
+        ],
+        "defect_line": 6,
+        "defect_anchor": "target.write_text("
+      }
+    },
+    {
+      "id": "py-07",
+      "stack": "python",
+      "category": "subprocess-unsafe",
+      "severity": "low",
+      "dimension": "security",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 1,
+        "files": 1,
+        "run_dates": 1,
+        "whitelisted_in_log": 0
+      },
+      "description": "subprocess.run with no timeout=, so a wedged child hangs the caller with no ceiling.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_download_dataset(url, dest):",
+          "    import subprocess",
+          "",
+          "    return subprocess.run(",
+          "        [\"curl\", \"-fsSL\", \"--max-time\", \"600\", \"-o\", str(dest), url],",
+          "        check=True,",
+          "    )"
+        ],
+        "defect_line": 4,
+        "defect_anchor": "return subprocess.run("
+      }
+    },
+    {
+      "id": "py-08",
+      "stack": "python",
+      "category": "layer-boundary-violation",
+      "severity": "medium",
+      "dimension": "architecture",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 3,
+        "files": 3,
+        "run_dates": 1,
+        "whitelisted_in_log": 0
+      },
+      "description": "UI layer constructs a concrete adapter instead of receiving the port from the composition root.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "class BenchStatusPanel:",
+          "    def __init__(self, parent):",
+          "        from app.adapters.storage.report_writer import ReportWriter",
+          "",
+          "        self._writer = ReportWriter()",
+          "        self._parent = parent"
+        ],
+        "defect_line": 5,
+        "defect_anchor": "self._writer = ReportWriter()"
+      }
+    },
+    {
+      "id": "py-09",
+      "stack": "python",
+      "category": "temp-file-orphaned",
+      "severity": "high",
+      "dimension": "security",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 2,
+        "files": 2,
+        "run_dates": 1,
+        "whitelisted_in_log": 0
+      },
+      "description": "Sensitive upload written to the shared system temp dir with no app-owned directory and no crash sweep.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_stage_upload(chunk):",
+          "    import tempfile",
+          "",
+          "    handle = tempfile.NamedTemporaryFile(suffix=\".bin\", delete=False)",
+          "    handle.write(chunk)",
+          "    handle.close()",
+          "    return handle.name"
+        ],
+        "defect_line": 4,
+        "defect_anchor": "tempfile.NamedTemporaryFile("
+      }
+    },
+    {
+      "id": "py-10",
+      "stack": "python",
+      "category": "config-validation-outside-try",
+      "severity": "medium",
+      "dimension": "architecture",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 1,
+        "files": 1,
+        "run_dates": 1,
+        "whitelisted_in_log": 0
+      },
+      "description": "Filesystem setup runs above the try that turns config errors into a readable exit, so it raises a raw OSError.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_build_config(raw):",
+          "    from pathlib import Path",
+          "",
+          "    temp_dir = Path(raw[\"temp_dir\"]).expanduser()",
+          "    temp_dir.mkdir(parents=True, exist_ok=True)",
+          "    try:",
+          "        return {\"temp_dir\": temp_dir, \"device\": raw[\"device\"]}",
+          "    except KeyError as exc:",
+          "        raise SystemExit(f\"config key missing: {exc}\") from exc"
+        ],
+        "defect_line": 5,
+        "defect_anchor": "temp_dir.mkdir("
+      }
+    },
+    {
+      "id": "py-11",
+      "stack": "python",
+      "category": "missing-return-annotation",
+      "severity": "low",
+      "dimension": "quality",
+      "target_ext": ".py",
+      "recurrence": {
+        "findings": 14,
+        "files": 8,
+        "run_dates": 2,
+        "whitelisted_in_log": 0
+      },
+      "description": "Public non-override function with typed parameters but no return annotation.",
+      "seed": {
+        "mode": "append",
+        "snippet": [
+          "def bench_refresh_toolbox(tab_index: int, force: bool = False):",
+          "    if force:",
+          "        return None",
+          "    return tab_index"
+        ],
+        "defect_line": 1,
+        "defect_anchor": "def bench_refresh_toolbox"
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fix"
+  short_description: "Fix a bug or apply review findings"
+policy:
+  allow_implicit_invocation: false

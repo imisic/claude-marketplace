@@ -1,0 +1,9 @@
+{
+  "name": "a-rules-optimizer-glob-verifier",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned runtime dependency for the a-rules-optimizer glob verifier.",
+  "dependencies": {
+    "minimatch": "10.2.6"
+  }
+}

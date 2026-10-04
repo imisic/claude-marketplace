@@ -1,0 +1,142 @@
+{
+  "name": "imisic",
+  "owner": {
+    "name": "Ivan Misic",
+    "url": "https://ivanmisic.net"
+  },
+  "description": "Ivan Misic's Claude Code tools: senior-review lenses, skills, and workflow commands.",
+  "plugins": [
+    {
+      "name": "role-lenses",
+      "source": "./plugins/role-lenses",
+      "description": "Get a pointed second opinion instead of agreement. Eight reviewer roles (product, design, architecture, engineering, operations, security, testing, and a red-team critic) each check one thing hard.",
+      "category": "workflow",
+      "author": {
+        "name": "Ivan Misic",
+        "url": "https://ivanmisic.net"
+      },
+      "homepage": "https://ivanmisic.net/toolshed/plugins/role-lenses",
+      "license": "MIT",
+      "keywords": [
+        "second-opinion",
+        "code-review",
+        "architecture",
+        "product-management",
+        "ux-design",
+        "security",
+        "testing",
+        "planning",
+        "decision-making"
+      ]
+    },
+    {
+      "name": "dev-workflow-forge",
+      "source": "./plugins/dev-workflow-forge",
+      "description": "Generate a code review skill and coding rules fitted to your own repository, then improve them from what your reviews keep finding. Every proposed change waits for your approval.",
+      "category": "workflow",
+      "author": {
+        "name": "Ivan Misic",
+        "url": "https://ivanmisic.net"
+      },
+      "homepage": "https://ivanmisic.net/toolshed/plugins/dev-workflow-forge",
+      "license": "MIT",
+      "keywords": [
+        "claude-code",
+        "code-review",
+        "coding-standards",
+        "coding-rules",
+        "review-automation",
+        "developer-workflow",
+        "project-instructions"
+      ]
+    },
+    {
+      "name": "dev-loop",
+      "source": "./plugins/dev-loop",
+      "description": "Three commands for the daily loop in Claude Code: fix a bug or apply a review report, commit with pre-flight checks, or run review, fix and commit as one flow, pausing after the review for your go-ahead.",
+      "category": "workflow",
+      "author": {
+        "name": "Ivan Misic",
+        "url": "https://ivanmisic.net"
+      },
+      "homepage": "https://ivanmisic.net/toolshed/plugins/dev-loop",
+      "license": "MIT",
+      "keywords": [
+        "git",
+        "commit",
+        "conventional-commits",
+        "code-review",
+        "debugging",
+        "bug-fixing",
+        "developer-workflow"
+      ]
+    },
+    {
+      "name": "unslop",
+      "source": "./plugins/unslop",
+      "description": "Review and revise writing, code and websites that read as generic AI output. Three scanners for prose, source code and web design, guidance for what a scanner can't see, and a method for building a voice profile from your own writing.",
+      "category": "quality",
+      "author": {
+        "name": "Ivan Misic",
+        "url": "https://ivanmisic.net"
+      },
+      "homepage": "https://ivanmisic.net/toolshed/plugins/unslop",
+      "license": "MIT",
+      "keywords": [
+        "writing",
+        "editing",
+        "writing-style",
+        "ai-writing",
+        "code-quality",
+        "code-review",
+        "web-design",
+        "ui",
+        "design"
+      ]
+    },
+    {
+      "name": "sanitize-public",
+      "source": "./plugins/sanitize-public",
+      "description": "Check a repository, plugin or download for credentials and private details before it goes public. Scans the files and the full Git history, matches your own private names in any spelling, and walks a checklist for leaks a scanner can't see.",
+      "category": "security",
+      "author": {
+        "name": "Ivan Misic",
+        "url": "https://ivanmisic.net"
+      },
+      "homepage": "https://ivanmisic.net/toolshed/plugins/sanitize-public",
+      "license": "MIT",
+      "keywords": [
+        "secrets",
+        "secret-scanning",
+        "privacy",
+        "leak-detection",
+        "publishing",
+        "git-history",
+        "open-source"
+      ]
+    },
+    {
+      "name": "search-visibility",
+      "source": "./plugins/search-visibility",
+      "description": "For website owners and marketers: turn Google Search Console data into a ranked list of SEO fixes, and check whether AI assistants can find, read and cite your site.",
+      "category": "seo",
+      "author": {
+        "name": "Ivan Misic",
+        "url": "https://ivanmisic.net"
+      },
+      "homepage": "https://ivanmisic.net/toolshed/plugins/search-visibility",
+      "license": "MIT",
+      "keywords": [
+        "seo",
+        "search-console",
+        "ai-search",
+        "seo-audit",
+        "indexing",
+        "structured-data",
+        "organic-traffic",
+        "content-strategy",
+        "analytics"
+      ]
+    }
+  ]
+}

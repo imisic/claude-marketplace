@@ -1,0 +1,5 @@
+interface:
+  display_name: "Design lens"
+  short_description: "Review a screen or user flow for clear actions, information order and missing states."
+policy:
+  allow_implicit_invocation: false

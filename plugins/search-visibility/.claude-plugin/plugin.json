@@ -1,0 +1,28 @@
+{
+  "name": "search-visibility",
+  "displayName": "Search Visibility: SEO and AI Search",
+  "description": "For website owners and marketers: turn Google Search Console data into a ranked list of SEO fixes, and check whether AI assistants can find, read and cite your site.",
+  "version": "1.3.2",
+  "author": {
+    "name": "Ivan Misic",
+    "url": "https://ivanmisic.net"
+  },
+  "homepage": "https://ivanmisic.net/toolshed/plugins/search-visibility",
+  "repository": "https://github.com/imisic/claude-marketplace",
+  "license": "MIT",
+  "keywords": [
+    "seo",
+    "search-console",
+    "ai-search",
+    "seo-audit",
+    "indexing",
+    "structured-data",
+    "organic-traffic",
+    "content-strategy",
+    "analytics"
+  ],
+  "documentationUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/search-visibility#readme",
+  "privacyPolicyUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/search-visibility#privacy",
+  "supportUrl": "https://github.com/imisic/claude-marketplace/issues",
+  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE"
+}

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Review Core"
+  short_description: "Shared review engine the project review skills read"
+policy:
+  allow_implicit_invocation: false

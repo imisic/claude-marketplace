@@ -1,0 +1,5 @@
+interface:
+  display_name: "Critic lens"
+  short_description: "Challenge a plan, claim or design and rank its weakest assumptions and likely failures."
+policy:
+  allow_implicit_invocation: false

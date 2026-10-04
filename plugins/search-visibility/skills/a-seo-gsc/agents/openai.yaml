@@ -1,0 +1,5 @@
+interface:
+  display_name: "SEO from GSC"
+  short_description: "Rank the fixes from your Search Console data"
+policy:
+  allow_implicit_invocation: false

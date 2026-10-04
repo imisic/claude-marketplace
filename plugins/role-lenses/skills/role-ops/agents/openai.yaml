@@ -1,0 +1,5 @@
+interface:
+  display_name: "Ops lens"
+  short_description: "Assess failures, their impact, detection and recovery for a system, change or incident."
+policy:
+  allow_implicit_invocation: false

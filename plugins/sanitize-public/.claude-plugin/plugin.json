@@ -1,0 +1,26 @@
+{
+  "name": "sanitize-public",
+  "displayName": "Sanitize Public: Leak Check Before Publishing",
+  "description": "Check a repository, plugin or download for credentials and private details before it goes public. Scans the files and the full Git history, matches your own private names in any spelling, and walks a checklist for leaks a scanner can't see.",
+  "version": "1.2.1",
+  "author": {
+    "name": "Ivan Misic",
+    "url": "https://ivanmisic.net"
+  },
+  "homepage": "https://ivanmisic.net/toolshed/plugins/sanitize-public",
+  "repository": "https://github.com/imisic/claude-marketplace",
+  "license": "MIT",
+  "keywords": [
+    "secrets",
+    "secret-scanning",
+    "privacy",
+    "leak-detection",
+    "publishing",
+    "git-history",
+    "open-source"
+  ],
+  "documentationUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/sanitize-public#readme",
+  "privacyPolicyUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/sanitize-public#privacy",
+  "supportUrl": "https://github.com/imisic/claude-marketplace/issues",
+  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE"
+}

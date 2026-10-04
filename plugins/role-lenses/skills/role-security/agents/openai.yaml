@@ -1,0 +1,5 @@
+interface:
+  display_name: "Security lens"
+  short_description: "Review code or a design for security risks, with concrete attack paths and the smallest fixes."
+policy:
+  allow_implicit_invocation: false

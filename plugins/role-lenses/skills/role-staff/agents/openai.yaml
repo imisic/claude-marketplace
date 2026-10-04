@@ -1,0 +1,5 @@
+interface:
+  display_name: "Staff lens"
+  short_description: "Recommend a simple implementation, build order and what to defer."
+policy:
+  allow_implicit_invocation: false

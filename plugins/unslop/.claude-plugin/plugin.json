@@ -1,0 +1,28 @@
+{
+  "name": "unslop",
+  "displayName": "Unslop: Writing, Code and Web Design Cleanup",
+  "description": "Review and revise writing, code and websites that read as generic AI output. Three scanners for prose, source code and web design, guidance for what a scanner can't see, and a method for building a voice profile from your own writing.",
+  "version": "1.4.2",
+  "author": {
+    "name": "Ivan Misic",
+    "url": "https://ivanmisic.net"
+  },
+  "homepage": "https://ivanmisic.net/toolshed/plugins/unslop",
+  "repository": "https://github.com/imisic/claude-marketplace",
+  "license": "MIT",
+  "keywords": [
+    "writing",
+    "editing",
+    "writing-style",
+    "ai-writing",
+    "code-quality",
+    "code-review",
+    "web-design",
+    "ui",
+    "design"
+  ],
+  "documentationUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/unslop#readme",
+  "privacyPolicyUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/unslop#privacy",
+  "supportUrl": "https://github.com/imisic/claude-marketplace/issues",
+  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE"
+}

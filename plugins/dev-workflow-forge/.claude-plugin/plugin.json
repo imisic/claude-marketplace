@@ -1,0 +1,26 @@
+{
+  "name": "dev-workflow-forge",
+  "displayName": "Dev Workflow Forge: Code Review Skills and Rules",
+  "description": "Generate a code review skill and coding rules fitted to your own repository, then improve them from what your reviews keep finding. Every proposed change waits for your approval.",
+  "version": "1.6.1",
+  "author": {
+    "name": "Ivan Misic",
+    "url": "https://ivanmisic.net"
+  },
+  "homepage": "https://ivanmisic.net/toolshed/plugins/dev-workflow-forge",
+  "repository": "https://github.com/imisic/claude-marketplace",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "code-review",
+    "coding-standards",
+    "coding-rules",
+    "review-automation",
+    "developer-workflow",
+    "project-instructions"
+  ],
+  "documentationUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/dev-workflow-forge#readme",
+  "privacyPolicyUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/dev-workflow-forge#privacy",
+  "supportUrl": "https://github.com/imisic/claude-marketplace/issues",
+  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE"
+}

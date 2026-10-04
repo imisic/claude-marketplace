@@ -1,0 +1,28 @@
+{
+  "name": "role-lenses",
+  "displayName": "Role Lenses: Expert Second Opinions",
+  "description": "Get a pointed second opinion instead of agreement. Eight reviewer roles (product, design, architecture, engineering, operations, security, testing, and a red-team critic) each check one thing hard.",
+  "version": "1.1.1",
+  "author": {
+    "name": "Ivan Misic",
+    "url": "https://ivanmisic.net"
+  },
+  "homepage": "https://ivanmisic.net/toolshed/plugins/role-lenses",
+  "repository": "https://github.com/imisic/claude-marketplace",
+  "license": "MIT",
+  "keywords": [
+    "second-opinion",
+    "code-review",
+    "architecture",
+    "product-management",
+    "ux-design",
+    "security",
+    "testing",
+    "planning",
+    "decision-making"
+  ],
+  "documentationUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/role-lenses#readme",
+  "privacyPolicyUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/role-lenses#privacy",
+  "supportUrl": "https://github.com/imisic/claude-marketplace/issues",
+  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE"
+}
