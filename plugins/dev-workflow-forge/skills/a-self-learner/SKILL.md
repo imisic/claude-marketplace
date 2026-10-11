@@ -36,6 +36,19 @@ If the project has no `.claude/reviews/` directory yet, the skill reports "no hi
 
 Read the signals. The skill needs data before it can cluster anything.
 
+Run the health report first; it is the same line `a-review-core` prints at the end of every review, and it tells you whether this pass is due before you open a single row:
+
+```bash
+python3 "${CLAUDE_SKILL_DIR}/../a-review-core/scripts/review_loop_health.py" --repo <project-dir-name>
+python3 "${CLAUDE_SKILL_DIR}/../a-review-core/scripts/review_loop_health.py" --repo <project-dir-name> --clusters --json
+```
+
+`${CLAUDE_SKILL_DIR}` is this skill's directory; the script ships with `a-review-core` in the same plugin. It scans `~/Projects` by default, so pass `--root <dir>` when your repos live elsewhere.
+
+The first command's `verdict` line (OVERDUE, OK or NO-CAPTURE, with the reason) is the frame for everything below, and the three numbers under it are the ones to carry into Phase 2: `unprocessed` (findings with no recorded resolution), the qualifying clusters (3 findings over 2 dates) and `last learning` (newest `applied-learnings.md` entry). An OK verdict means this run will mostly re-skip clusters already in the ledger; say so and ask before spending the pass. Without `--repo` it prints every repo under the root as one table, which is how to pick the next project to run on.
+
+**The second command is the cluster list, and it is the input to Phase 2. Do not re-group the rows yourself.** `--clusters --json` prints every cluster the report counted, one object per cluster: `category`, `count`, `dates`, `first`, `last`, `files` (distinct files touched), `covered` (date of the newest resolution row naming the category, `null` when none, a re-emergence signal for Phase 3) and `finding_ids`. The script already applied the thresholds, the resolution fold and the date ordering, so the skill's job starts at judging that list. Open the rows behind a cluster by its `finding_ids` when the judgement needs the messages, files or severities.
+
 ### 1a: Review log
 
 ```bash
@@ -61,7 +74,7 @@ If the file exists, read every line as JSON. Drop malformed lines with a warning
 **A line count is not a finding count.** Check `schema` on the first row and read accordingly:
 
 - **Schema 2 (current).** Count rows where `type` is `finding` and `disposition` is `confirmed`. Resolutions and dismissals are separate rows and must not inflate the count. This is the whole reason v2 exists.
-- **Schema 1 (no `schema` key).** The two fields you would reach for both mislead. Resolution rows share the file, because a `*-fix` skill appends `FIXED:` rows to the same JSONL, so a log can be half resolutions. And `whitelisted` is false almost everywhere, since it is set only when a caller passed `--whitelisted`, so a dismissed finding looks exactly like a confirmed one. **Migrate rather than working around it:** `python3 scripts/migrate-review-log-v2.py <log>` prints a plan, `--apply` rewrites and keeps a `.bak`. Offer this whenever you meet a v1 log; it is inert plumbing, the same class as scaffolding the capture helper above.
+- **Schema 1 (no `schema` key).** The two fields you would reach for both mislead. Resolution rows share the file, because a `*-fix` skill appends `FIXED:` rows to the same JSONL, so a log can be half resolutions. And `whitelisted` is false almost everywhere, since it is set only when a caller passed `--whitelisted`, so a dismissed finding looks exactly like a confirmed one. **Migrate rather than working around it:** `python3 "${CLAUDE_SKILL_DIR}/scripts/migrate-review-log-v2.py" <log>` prints a plan, `--apply` rewrites and keeps a `.bak`. Offer this whenever you meet a v1 log; it is inert plumbing, the same class as scaffolding the capture helper above.
 - Either way, check whether a category's per-run count is **falling** before proposing anything. A category that went 16, 16, 1, 1, 1 across runs is already fixed at source, and its historical rows are backlog rather than evidence.
 
 ### 1b: Project memory (optional convention)
@@ -186,7 +199,7 @@ Missing fields → proposal is incomplete, don't show it to the user.
 5. On `skip` → leave for next run, neither apply nor reject.
 6. On `details` → show evidence in full (all finding lines, not just count), then re-prompt.
 
-**Commit policy.** Even after approval, this skill does not commit. The target skill writes the file; the user decides when to stage and commit per the global per-commit-ask rule. Do not invoke `git commit` from this workflow.
+**Commit policy.** Even after approval, this skill does not commit. The target skill writes the file; the user decides when to stage and commit, following their own project workflow. Do not invoke `git commit` from this workflow.
 
 ---
 
@@ -224,6 +237,7 @@ After the approval loop finishes:
 
 | File | When to read | Contains |
 |-|-|-|
+| `${CLAUDE_SKILL_DIR}/../a-review-core/scripts/review_loop_health.py` | Phase 1, first command of every run; `--repo <name> --clusters --json` for the cluster list Phase 2 judges | Verdict (OVERDUE / OK / NO-CAPTURE), unprocessed findings, qualifying clusters, last review and last learning dates; with `--clusters`, every qualifying cluster with `files`, `covered` and `finding_ids` |
 | `references/review-log-schema.md` | Phase 1a (understanding the log format) and any capture-side integration | JSONL schema, field definitions, `.claude/reviews/` directory convention |
 | `references/recurrence-detection.md` | Phase 2 (clustering) | Grouping, hashing, thresholds, cluster classification |
 | `references/proposal-template.md` | Phase 3 (drafting proposals) | Required fields, format, target-skill routing rules |

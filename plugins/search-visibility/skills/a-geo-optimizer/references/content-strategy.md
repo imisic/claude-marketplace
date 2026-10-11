@@ -2,6 +2,8 @@
 
 How to structure, write, and maintain content that AI systems extract, cite, and recommend.
 
+**How to read this file.** It gives direction, not measured effects. Earlier versions quoted citation percentages and multipliers from industry analyses that named no source; they were removed because a figure with no source and no stated limits cannot justify a rule. If you quote a number to a client or on a page, quote one you have checked against a named primary source, with its date, the platforms it measured and its limits.
+
 ## Table of Contents
 
 1. [The Answer-Capsule Format](#1-the-answer-capsule-format)
@@ -71,7 +73,7 @@ understand what a NAS actually is...
 
 ## 2. Front-Loading Critical Content
 
-**44.2% of all LLM citations come from the first 30% of a page's text.**
+**Put the answer near the start of the page.** Readers and AI systems both meet the opening first; background and method can follow.
 
 Rules:
 - The most important, quotable, citable content goes at the top
@@ -87,9 +89,7 @@ For blog posts: Lead with the answer or key finding. Background and methodology 
 
 ## 3. Section Structure and Length
 
-**Optimal section length: 120-180 words per self-contained section.**
-
-Pages using this section length receive 70% more ChatGPT citations than pages with sections under 50 words.
+**Size each section to the question it answers.** Give a distinct question its own section, long enough to answer it completely and short enough that the answer is not buried.
 
 Each section should be:
 - Self-contained (extractable without needing context from other sections)
@@ -125,16 +125,16 @@ Also: ChatGPT internally appends intent modifiers like "detailed guide", "step-b
 
 ## 5. Statistical Density and Source Attribution
 
-**Content with verifiable claims receives 44% more citations. The original GEO research found citing sources increased visibility by 115.1%.**
+**Include evidence where it helps the reader.** The original GEO research (the 2023 paper "GEO: Generative Engine Optimization") found that adding cited sources, quotations and statistics improved visibility on its own benchmark; treat that as direction, not a guarantee for any particular assistant.
 
 Rules:
-- Include one verifiable statistic per 150-200 words
+- Use a statistic when it is the clearest evidence for a claim, not to meet a quota
 - Always attribute statistics to their source
 - Use specific numbers, not vague claims ("3.2× faster" not "much faster")
 - Include dates with stats to signal freshness
 - Prefer original data you've collected over recycled third-party stats
 
-**Good:** "According to our 2026 client survey, 73% of small businesses in Croatia report spending less than 2 hours per week on social media marketing."
+**Good (hypothetical figures, use your own sourced data):** "According to our 2026 client survey, 73% of small businesses in Croatia report spending less than 2 hours per week on social media marketing."
 
 **Bad:** "Many businesses find social media marketing time-consuming."
 
@@ -142,7 +142,7 @@ Rules:
 
 ## 6. Entity Density
 
-**Content with high entity density shows 20.6% higher citation rates.**
+**Name things specifically.** Specific names, dates, places and products make a passage easier to understand and to quote than vague references.
 
 Entities = proper nouns, specific names, dates, places, product names, company names, standards, technologies.
 
@@ -151,7 +151,7 @@ Entities = proper nouns, specific names, dates, places, product names, company n
 - Reference specific standards, frameworks, or methodologies by name
 - Mention specific tools, platforms, or competitors by name when relevant
 
-**High entity density:** "Zagreb-based agencies using Figma and Webflow in 2026 report 40% faster delivery times compared to agencies still using WordPress page builders."
+**High entity density (hypothetical figures):** "Zagreb-based agencies using Figma and Webflow in 2026 report 40% faster delivery times compared to agencies still using WordPress page builders."
 
 **Low entity density:** "Agencies using modern design tools report faster delivery times than those using older platforms."
 
@@ -184,8 +184,8 @@ FAQ sections with question-style headings nearly double citation chances. AI sys
 **Requirements:**
 - Use actual questions your customers/readers ask
 - Match the conversational phrasing people use with AI ("How do I..." not "Methodology for...")
-- Each answer: 40-80 words, direct and complete
-- 5-10 FAQs per page is the sweet spot
+- Each answer direct and complete, as long as the question needs
+- Include the questions readers actually ask, not a set number
 - Pair with FAQPage JSON-LD schema (see technical-checklist.md)
 
 **Good FAQ structure:**
@@ -210,7 +210,7 @@ integrations can extend to 3-6 months.
 
 ## 9. Comparison Tables
 
-**Comparison tables deliver 2.5× more citations than text-only equivalents.**
+**Use a table when readers compare options.** A table states the relationships between items more clearly than prose.
 
 Use HTML tables or Markdown tables for:
 - Product vs. competitor comparisons
@@ -225,17 +225,17 @@ Keep tables clean and data-rich. AI systems extract structured relationships fro
 
 ## 10. Content Formats That Get Cited
 
-By citation frequency (ChatGPT data):
+Formats that answer a clear question tend to be quoted:
 
-| Format | % of Citations | Notes |
-|--------|---------------|-------|
-| "Best X" listicles | 43.8% | Highest citation rate |
-| How-to guides | ~25% | Especially with step-by-step structure |
-| Comparison articles | ~15% | X vs Y format |
-| Definition/explainer | ~10% | "What is X" format |
-| Case studies | ~5% | With specific metrics and outcomes |
+| Format | Notes |
+|--------|-------|
+| "Best X" lists | Useful when the list is honest about criteria |
+| How-to guides | Especially with step-by-step structure |
+| Comparison articles | X vs Y format |
+| Definitions and explainers | "What is X" format |
+| Case studies | With specific metrics and outcomes |
 
-Prioritize creating "Best X for Y" content for your niche. These are the most-cited format by a wide margin.
+Pick the format that fits what your readers are trying to decide, not the one assumed to be cited most.
 
 ---
 
@@ -260,12 +260,12 @@ For the Organization/brand:
 
 ## 12. Content Freshness
 
-**Content updated within 30 days accounts for 76.4% of all AI citations.**
+**Keep pages current when their facts change.**
 
 Rules:
-- Establish a 60-90 day refresh cycle for key pages
+- Review key pages on a schedule that matches how fast their facts change
 - Update with substantive changes (not just timestamp bumps)
-- Pages with genuine updates earn 3.8× more citations than cosmetic refreshes
+- A changed date with no changed content misleads readers and earns nothing
 - Display a visible "Last Updated: [date]" on the page
 - The `dateModified` in your Article schema must match the visible date
 
@@ -273,7 +273,7 @@ Rules:
 
 ## 13. Topic Cluster Architecture
 
-**82.5% of ChatGPT citations link to pages within established topic hierarchies.**
+**Group related pages into clusters.** A hub page that links its detailed pages, and links back from them, makes the whole topic easier to follow and to crawl.
 
 Structure:
 ```
@@ -290,24 +290,23 @@ Rules:
 - Each cluster page links back to pillar
 - Cluster pages cross-link to related clusters
 - Use descriptive anchor text
-- Bidirectional internal linking delivers 2.7× citation multiplier
 
 ---
 
 ## 14. Off-Site Authority Building
 
-**Brands are 6.5× more likely to be cited through third-party mentions than their own website.**
+**Earn mentions elsewhere.** Assistants draw on what other sites say about a brand, not only on the brand's own pages.
 
 Priority platforms for AI citations:
-1. **YouTube**: 39.2% of social citations in AI Overviews. Create demo videos, tutorials, case studies.
-2. **Reddit**: 40.1% of AI responses reference Reddit. Build authentic presence in relevant subreddits.
-3. **Review platforms**: G2, Clutch, Capterra, Trustpilot provide 4.6-6.3× citation multiplier.
+1. **YouTube**: demo videos, tutorials, case studies.
+2. **Reddit**: build an authentic presence in relevant subreddits.
+3. **Review platforms**: G2, Clutch, Capterra, Trustpilot.
 4. **Industry comparison articles**: Get listed in "best [service] in [location/niche]" articles.
 5. **Guest posts**: Contribute to industry publications with expert commentary.
 6. **Wikipedia/Wikidata**: Create or update entity entries for your brand/key people.
 7. **Google Business Profile**: Primary data source for local AI recommendations.
 
-Domains with active profiles across 4+ third-party platforms see 2.8× citation likelihood increase.
+Active profiles on the platforms your audience actually uses matter more than a presence everywhere.
 
 ---
 
@@ -363,6 +362,6 @@ AI systems pick up corrections faster from multiple independent sources than fro
 - **Content behind login walls**: AI crawlers cannot access paywalled content
 - **Information scattered across multiple thin pages**: Consolidate into one page that covers the whole topic
 - **Timestamp-only refreshes**: Changing the date without substantive updates doesn't fool AI systems
-- **Ignoring a platform**: Only 11-14% of citations overlap between platforms; optimize for all
+- **Ignoring a platform**: different assistants cite different sources; optimize for all
 
 **The Chegg lesson:** If your content is commodity information that AI can generate independently, you'll be displaced. Content must include what AI cannot replicate: original data, proprietary research, real case studies with specific metrics, expert quotes from named professionals, and first-person experience.

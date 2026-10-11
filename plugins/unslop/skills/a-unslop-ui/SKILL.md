@@ -16,7 +16,7 @@ the project actually made. Taste, brand, and layout judgment stay yours.
 
 ## The trap: do not swap one default for another
 
-Every anti-slop effort fails the same way, by replacing one default look with another. The 2024
+Anti-slop efforts usually fail the same way, by replacing one default look with another. The 2024
 default was the purple-to-blue gradient on a dark hero. The 2026 default is a warm cream
 background, a serif display face (Instrument Serif, Fraunces), and a sage or forest-green
 accent, which is the current Claude/Anthropic house look. Swapping the first for the second is
@@ -63,9 +63,9 @@ or offer two or three distinct directions. The value is breaking the monoculture
 On "does this look AI" or "de-slop this," run the scanner, then fix in priority order.
 
 ```bash
-python3 scripts/devibe_scan.py <path>                 # report + vibe score
-python3 scripts/devibe_scan.py <path> --severity high # strongest only
-python3 scripts/devibe_scan.py <path> --json          # for CI
+python3 "${CLAUDE_SKILL_DIR}/scripts/devibe_scan.py" <path>                 # report + vibe score
+python3 "${CLAUDE_SKILL_DIR}/scripts/devibe_scan.py" <path> --severity high # strongest only
+python3 "${CLAUDE_SKILL_DIR}/scripts/devibe_scan.py" <path> --json          # for CI
 ```
 
 It scans `.html .css .scss .js .jsx .ts .tsx .vue .svelte .astro`, reports each finding with

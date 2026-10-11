@@ -56,7 +56,7 @@ Every skill is one of two things, and the frontmatter has to say which.
 
 The test is whether the model could usefully reach for it on its own. A skill that only makes sense when deliberately invoked but carries a trigger paragraph pays that paragraph's context cost in every session, and fires when nobody asked.
 
-Every skill also carries an `agents/openai.yaml` beside its `SKILL.md`, holding Codex picker metadata (`interface.display_name`, `interface.short_description`). `policy.allow_implicit_invocation` defaults to true, so only a user-invoked skill sets it, to `false`. **The two harnesses must agree**: a skill is user-invoked in both or neither. Nothing enforces that, so when you change one, change the other in the same edit.
+Every skill also carries an `agents/openai.yaml` beside its `SKILL.md`, holding Codex picker metadata (`interface.display_name`, `interface.short_description`). `policy.allow_implicit_invocation` defaults to true, so only a user-invoked skill sets it, to `false`. **Claude Code and Codex must use the same invocation setting**: a skill is user-invoked in both or neither. Nothing enforces that, so when you change one, change the other in the same edit.
 
 Commands under `commands/` are typed by definition and have neither setting. Converting one to a skill would make it reachable from Codex too, which is the reason to do it if the question ever comes up.
 

@@ -10,6 +10,8 @@ The mechanics of a multi-agent code review, with nothing project-specific in the
 
 **Read this in full before doing anything else.** The project skill that sent you here assumes it.
 
+**Where this file lives.** You reached this file by reading it, not by invoking it, so no skill substitution applies here. The project skill resolved this directory before sending you here; every command below writes it as `<core-dir>`. Replace that with the literal path, quoted, in each command, because shell variables do not carry from one command to the next.
+
 Two rules govern the split, and they are what keeps this file useful:
 
 - **If it is true for every codebase, it belongs here.** A fix landed here reaches every project at once. That is the entire point: before this file existed, the same eight skills each carried their own copy of the engine, and an improvement to one of them reached the others only when somebody remembered to re-run the generator. Measured 2026-08-29: hostile-content preflight checks were missing from three of eight skills, scope tables from three, rule-candidate surfacing from three, and whitelist growth markers from four, none of it deliberate.
@@ -27,6 +29,16 @@ git diff --name-only <base>...HEAD # a branch under review
 ```
 
 If the range diff is empty, fall back to the working tree, and vice versa. A review that reports "no changes" while the user is staring at edits has misread the scope, not found a clean tree. The project skill names the flags that widen this (`--full` and friends).
+
+**When the tree is clean and no base was given, the scope is everything since the last review.** Derive it from the capture log rather than a new field: the newest `date` in `.claude/reviews/review-issues.jsonl` names when the last run looked, and `git rev-list -1 --before="<that date>" HEAD` names the commit it looked at. Review `<that commit>..HEAD` with the mechanism angles. With no log yet, take the last 24 hours of commits. State the scope in the report. One limit to know: this scope does not recheck untouched files, so it never re-reads what the previous review missed. A bug in a file untouched since the last run is the dimensions' job, and a grep-able pitfall belongs in the project's preflight checks, which is what the learn pass produces from a miss. Why this scope exists, with the incidents behind it: `references/scope-history.md`.
+
+One script resolves all of this, in the order above, so every project computes it identically and nobody re-derives it in prose:
+
+```bash
+bash "<core-dir>/scripts/review-scope.sh" --json   # --base <ref> and --full are the only other flags
+```
+
+`mode` is which scope applied (`range`, `working-tree`, `since-last-review`, `full`, or `empty` when nothing landed since the base), `base` and `base_date` say where the diff starts, and `files` is the list the agents get. `file_count` and `diff_bytes` are the totals the Coverage line in §8 is measured against; `note` says when a fallback was taken (no capture log yet, so the last 24 hours) and, under `--full`, which recent half the whole-tree run still reads line by line (§4). The cutoff is midnight of the log date, so the review day's own commits are re-read rather than skipped.
 
 **Flags scope the agents, not the preflight scan.** See §2.
 
@@ -60,7 +72,7 @@ Use `pipeline()` so each dimension's findings begin verifying as soon as that di
 
 Workflow requires the user to have opted into multi-agent orchestration. A user-invoked review skill whose instructions say to call Workflow satisfies that; say so explicitly in the project skill.
 
-**Give the verifier seat a smaller model, and let finders inherit the session's.** A verifier takes one finding and tries to refute it against the code. That is the mechanical seat in this design and it does not need the session's top model; finders are where judgement lives. In a Workflow script both are the `model` option per `agent()` call. Verifiers outnumber finders several times over, because there is one per finding, so leaving every seat unset puts most of a run's agents on the most expensive model. Gates, scorers and mechanical splits take the smaller model for the same reason. Anything else stays unset and inherits.
+**Give the verifier seat a smaller model at `medium` effort. Pin the finder seat at `high` effort and let it inherit the session's model.** A verifier takes findings and tries to refute them against the code. That is the mechanical seat in this design and it needs neither the session's top model nor its top effort; finders are where judgement lives, and their effort must not depend on whatever effort the session was last left at, or a review run while the session sat at `medium` to save tokens on something else thinks less hard than a one-file edit. In a Workflow script both are the `model` and `effort` options per `agent()` call. Verifiers outnumber finders several times over when there is one per finding (§6 now batches them by file), so leaving every seat unset puts most of a run's agents on the most expensive model at the session effort. Gates, scorers and mechanical splits take the smaller model for the same reason. Anything else stays unset and inherits.
 
 **Hold model, effort, tools and output schema constant across every agent in a seat.** Those four, plus the agent type and the working directory, decide whether two fan-out agents share a prompt-cache prefix: an agent that starts after a matching sibling has begun responding reads that sibling's cache instead of processing the shared prefix again ([Prompt caching in a fan-out](https://code.claude.com/docs/en/workflows#prompt-caching-in-a-fan-out)). Vary any one of the six between siblings and every agent in that seat pays for the prefix in full. The easy mistake is a per-finding tweak, such as a different schema or tool list for one finding type, that splits a seat into several cache groups.
 
@@ -70,19 +82,33 @@ A subagent's cache expires after five minutes by default, and a multi-wave revie
 
 ## 4. What the finders look for
 
-Two angle sets, picked by scope. They are complementary: mechanism angles are how a diff is reviewed, dimensions are how a codebase is.
+Three angle sets. Mechanism and cleanup angles are how a diff is reviewed, dimensions are how a codebase is, and they are complementary rather than alternatives.
 
-### Mechanism angles (diff-relative, for the default scope)
+**A whole-tree run still reads the recent diff.** Dimensions sweep the tree with checklists, and a checklist only looks backwards, at patterns that have already shipped. The mechanism and cleanup angles run in the same run over the since-last-review diff from §1, so the hunks nobody has read yet get read line by line. A project skill whose `--full` flag says "no diff angles" has turned the full review into the one that misses new bug shapes: on 2026-10-11 a `--full` run missed a sibling handler with a different catch list, two timestamps compared as strings, and an input compared without normalising its BOM, all in files changed that week. A project may drop the diff half of a full run only by recording why in its flag table.
+
+### Mechanism angles (diff-relative)
 
 | Angle | What it does |
 |-|-|
-| Line scan | Every hunk line by line, then the enclosing function. Bugs in unchanged lines of a touched function are in scope: the change re-exposes them or fails to fix them |
+| Line scan | Every hunk line by line, then the enclosing function. Bugs in unchanged lines of a touched function are in scope: the change re-exposes them or fails to fix them. For every line ask what input, state, timing or platform makes it wrong. Seed list, true in every language: inverted or wrong condition, off-by-one, null or undefined dereference, missing `await`, falsy zero treated as missing, wrong-variable copy-paste, error swallowed in a catch that should propagate, unescaped regex metacharacters, timestamps or versions compared as text, input compared without normalising BOM, whitespace or case |
 | Removed behavior | For every deleted or replaced line, name the invariant it enforced, then find where the new code re-establishes it. If you cannot find it, that is the finding |
-| Cross-file trace | For each changed function, grep its callers and check whether the change breaks a call site (new precondition, changed return shape, new exception, new ordering dependency). Check callees too |
-| Language pitfalls | The classic traps of this diff's language and framework. The project skill names the real ones |
+| Cross-file trace | For each changed function, grep its callers and check whether the change breaks a call site (new precondition, changed return shape, new exception, new ordering dependency). Check callees too. Two checks are explicit because they found real 500s: for each changed or newly called function, list the exception types it can raise and compare that list with every caller's catch list; and when a sibling action or handler calls the same function, check it handles the same failures the same way. A sibling that catches what this one lets through is the finding When the change adds a refusal or a condition on data that is written somewhere else, trace one hop further, into every writer of that data; a finder that stopped at the new refusal missed the code path that creates the very state it refused (2026-10-11) |
+| Language pitfalls | The classic traps of this diff's language and framework, beyond the seed list above. The project skill names the real ones |
 | Wrapper correctness | When the change adds or modifies something wrapping another thing (cache, proxy, decorator, adapter), check every method routes to the wrapped instance rather than back through a registry, session or global, and that it forwards what callers actually use |
 
 Removed behavior is the angle with no substitute. Every other angle reads what the code now says; only this one reads what it stopped saying, and a deleted guard leaves no trace for a reader who sees only the new state.
+
+### Cleanup angles (diff-relative, medium depth and above)
+
+These hunt for the findings whose impact is a counted `cost` rather than a failure scenario (§7). Without them that half of the contract has no finder, and a predicate written twice or a helper pasted into 22 files has no owner.
+
+| Angle | What it does |
+|-|-|
+| Reuse | New code that re-implements something the codebase already has. Grep shared and utility modules and the files adjacent to the change, and name the existing helper to call instead In a whole-tree run, also grep the tree for other copies of any helper the diff touches: a third copy of a migration helper sits outside the diff, and only a tree-wide count finds it |
+| Simplification | Complexity the diff adds for nothing: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job |
+| Altitude | Whether each change fixes the root cause at the right depth or patches a symptom. Special cases layered on shared infrastructure are the sign the fix is not deep enough; name the more general change to the underlying mechanism |
+
+When a cap forces a cut, correctness outranks cleanup, always.
 
 ### Dimensions (subject-relative, for whole-tree scope)
 
@@ -102,7 +128,7 @@ Assemble each brief from these, and hand the agent files rather than summaries o
 6. **The project rules governing the changed paths.** Resolve them, do not guess:
    ```bash
    for f in $(git diff --name-only HEAD); do
-     node ../a-rules-optimizer/scripts/verify-rule-globs.js --for "$f"
+     node "<core-dir>/../a-rules-optimizer/scripts/verify-rule-globs.js" --for "$f"
    done
    ```
    That resolver uses the same matcher Claude Code uses, so it answers with the rules that would really load. Hand the rule file itself: a summary is one edit away from disagreeing with the original. This wiring is necessary rather than redundant, because a path-scoped rule fires on a read and not on a write, and loads into a delegated subagent rather than the main thread, so a dispatched review is exactly the case where rules do not arrive on their own.
@@ -122,7 +148,7 @@ Assemble each brief from these, and hand the agent files rather than summaries o
 
    Tell the agent plainly: these are past observations, some fixed, some dismissed, some open. Verify against current code before reporting, and never report a past finding as a new one. Uncapped, a finder stops reviewing the diff and starts summarizing the log.
 8. **The generic false-positive taxonomy** below.
-9. **The output rules** from §7.
+9. **The candidate shape, not the finding contract.** A finder returns candidates: `file`, `line`, a one-line `summary` and a concrete `failure_scenario` (or counted `cost` for a cleanup angle). The six-field contract in §7 is filled for survivors after verify, never demanded at the finder. Tell every finder, in these words: pass every candidate with a nameable failure scenario through; finders that silently drop half-believed candidates are the dominant cause of misses. Verify exists so that finders can afford to be wrong; a finder that pre-filters to protect its precision has taken the verifier's job and does it worse, because it cannot read the code a second time.
 
 ### The generic false-positive taxonomy
 
@@ -139,8 +165,11 @@ Not findings, do not report:
 - Behavior changes that are plainly the point of the change.
 - Something flagged by a rule but explicitly silenced in the code: an ignore
   comment, an allowlist entry, a documented exception.
-- A missing test, missing docs or a general hardening idea, unless the project
-  rules require it for this kind of change.
+- A missing test, missing docs or a general hardening idea with no nameable
+  failure scenario, unless the project rules require it for this kind of change.
+  A "hardening" candidate that can name the input which makes the current code
+  fail (a BOM in front of a verification token, a trailing space the trim does
+  not cover) is a correctness candidate and goes through.
 
 Both this list and the project whitelist bind. Neither is advisory.
 ```
@@ -150,6 +179,8 @@ Both this list and the project whitelist bind. Neither is advisory.
 ## 6. Verify
 
 Every finding is checked by a second agent that traces the chain from the source rather than accepting the finder's reasoning. On the 2026-08-05 run this refuted 6 of 18 raw findings, three of them cases where the stated mechanism was accurate but the claimed consequence did not follow. That failure (true mechanism, wrong conclusion) is the dominant one on a mature codebase and nothing else catches it.
+
+**Batch verification by file, about five candidates per verifier.** Group the deduplicated candidates by file and hand each verifier one file's candidates, splitting a file with more than five across two agents. The verifier reads the file once, which it had to do per candidate anyway, and returns the three-verdict schema below once per candidate, so nothing downstream changes. One verifier per finding makes the verify stage several times the size of the finder stage in agents and wall-clock; batching removes most of that. The risk taken on is anchoring between candidates in one file, so every verifier brief carries this sentence: judge each candidate on its own evidence; a refuted neighbour says nothing about this one. Measure the saving on the next run rather than assuming it.
 
 Three verdicts, never a yes or no:
 
@@ -192,12 +223,12 @@ Scale four things together, not just an instruction to try harder:
 
 | Level | Angles | Candidates per angle | Verify | Sweep |
 |-|-|-|-|-|
-| low | single pass, no subagents | cap the run at ~4 | none | no |
-| medium | full set | ~6 | strict | no |
-| high | full set | ~6 | recall-biased | no |
-| max | full set plus mechanism angles | ~8 | recall-biased | yes |
+| low | one pass over the diff, no subagents, mechanism angles only | cap the run at ~4 | none | no |
+| medium | mechanism and cleanup angles on the diff, plus dimensions when the scope is the tree | ~6 | strict | no |
+| high | same set | ~6 | recall-biased | no |
+| max | same set | ~8 | recall-biased | yes |
 
-When a cap forces a cut, correctness outranks cleanup.
+"Full set" always includes the diff angles from §4, whatever the scope. When a cap forces a cut, correctness outranks cleanup.
 
 ### Sweep (max only)
 
@@ -207,7 +238,7 @@ One more finder, fresh, holding the deduplicated list, hunting only for what is 
 
 ## 7. The finding contract
 
-Every finding at Critical, High or Medium carries all six fields. Incomplete findings are rejected rather than reported: if an agent cannot fill them, it either has not investigated enough or does not have a finding.
+Every finding at Critical, High or Medium carries all six fields. Incomplete findings are rejected rather than reported: if an agent cannot fill them, it either has not investigated enough or does not have a finding. The contract binds at reconciliation (§9), after verify; finders hand in candidates (§5 item 9) and the fields are completed for the survivors, so a half-believed candidate reaches the verifier instead of dying at the finder for want of a filled-in table.
 
 | Field | What it holds |
 |-|-|
@@ -235,6 +266,7 @@ The skeleton, in order:
 ```markdown
 # Code Review Report
 Project / Stack / Target / Date
+Coverage: X of Y changed files read in full, A of B KB of diff read, since <base commit or "working tree">
 Preflight: X checks run, Y findings fed to agents
 Verify: X candidates, Y confirmed, Z plausible, N refuted, strict|recall-biased
 
@@ -251,6 +283,8 @@ Verify: X candidates, Y confirmed, Z plausible, N refuted, strict|recall-biased
 ```
 
 The Skipped table is load-bearing: without it a deliberate skip and an oversight look identical, and the next run rediscovers the same thing cold.
+
+The Coverage line is what keeps "(none)" honest. A reviewer that read 60 KB of a 968 KB diff and reported nothing has reported nothing about 94 percent of the change; the line makes that visible instead of letting an empty result read as a clean one. The totals (`Y` files, `B` KB, `since <base>`) are `file_count`, `diff_bytes` and `base` from the §1 scope script, never recomputed by hand; the read numbers (`X`, `A`) come from the run itself, what the agents actually read in full.
 
 ### Presenting it
 
@@ -289,7 +323,7 @@ Before the report is presented:
 
 ## 10. Capture
 
-Append every confirmed finding to `.claude/reviews/review-issues.jsonl` through the project's `.claude/scripts/capture-finding.sh`. One `RUN_ID` per review, reused for every row in it. This feeds `a-self-learner`, which is what turns a recurring finding into a rule or a check instead of a finding you get again next month.
+Append every confirmed finding to `.claude/reviews/review-issues.jsonl` through the project's `.claude/scripts/capture-finding.sh`. One `RUN_ID` per review, reused for every row in it. Pass the shared arguments as a bash array (`B=(--run-id "$RUN_ID" ...)` then `"${B[@]}"`): the Bash tool runs zsh, which does not word-split an unquoted `$B`, and a capture failed on exactly that on 2026-10-11. This feeds `a-self-learner`, which is what turns a recurring finding into a rule or a check instead of a finding you get again next month.
 
 Capture dismissals too, with `--dismissed "<reason>"`. A dismissed finding is the evidence behind a whitelist entry, and a pattern dismissed repeatedly is a check that needs narrowing. Dismissals carry `disposition: "dismissed"` and are excluded from recurrence counts, so capturing them cannot inflate a cluster.
 
@@ -298,7 +332,7 @@ The `--category` slug is the clustering key, so one pattern must get one slug, e
 **Report staleness at the end of the run**, as one line, from the tool rather than by counting yourself:
 
 ```bash
-python3 scripts/review_loop_health.py --repo <project>
+python3 "<core-dir>/scripts/review_loop_health.py" --repo <project>
 ```
 
 Report its `verdict` line verbatim and stop there. Projects go on capturing findings for months without anyone running the learning pass, purely because nothing ever mentions it. A status line is the whole fix; it must never delay or replace the findings themselves, and the review never runs the learning pass itself, since that proposes changes to rules and checks and needs the user in the loop.

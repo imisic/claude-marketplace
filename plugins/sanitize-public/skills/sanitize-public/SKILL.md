@@ -85,7 +85,7 @@ The assertions still match, because the code under test is identical. The conten
    already visible in this session or environment, before running the
    scanner. If you proceed without one, say plainly the run only catches
    generic patterns. Format is under "Running the scanner" below.
-3. **Run the scanner at the gate floor.** `python3 scripts/leak_scan.py
+3. **Run the scanner at the gate floor.** `python3 "${CLAUDE_SKILL_DIR}/scripts/leak_scan.py"
    <artifact> --severity medium`. Exit code 1 means stop and review. `high`
    findings never ship. `medium` (internal host, LAN IP, home path, a private
    email domain) almost never ship; each needs a reason. Re-run until clean.
@@ -101,15 +101,15 @@ The assertions still match, because the code under test is identical. The conten
 7. **Check the author identity on every commit you will publish.** A fresh clone silently inherits the machine's global git email, which is often a work address. `git log <ref> --format="%ae %ce" | sort -u` should return only the identity you mean to publish under. Fix it with a repo-local `git config user.email` and a rewrite of the affected commits before they are pushed.
 8. **Open every binary that ships.** Images, PDFs and archives are skipped by the scanner on purpose and counted in its output. A screenshot with a real terminal, tab, path or calendar in frame leaks more than any string, and no regex will ever see it.
 
-**One command for the mechanical layers.** `scripts/publish_gate.sh --repo <repo> --ref <what-you-will-push> --identity <public-email> [--also <unzipped-bundle>]...` runs the tree scan, the history extract, the identity check, gitleaks (via a local binary or a network-less Docker container, with the reviewed allowlist in `references/gitleaks.toml`) and the binary listing, and exits 1 on any finding. It refuses to run without a private layer unless you pass `--no-private`, because without your own terms the scan passes everything that matters. Point `--ref` at what will be pushed rather than your working branch, and pass anything else that ships (a downloadable bundle, exported page copy) through `--also`: the same leak can sit in the repo, its history and a download built from an older tree at once. The contextual pass in step 4 is still yours.
+**One command for the mechanical layers.** `bash "${CLAUDE_SKILL_DIR}/scripts/publish_gate.sh" --repo <absolute path to the repository root> --ref <what-you-will-push> --identity <public-email> [--also <unzipped-bundle>]...` runs the tree scan, the history extract, the identity check, gitleaks (via a local binary or a network-less Docker container, with the reviewed allowlist in `references/gitleaks.toml`) and the binary listing, and exits 1 on any finding. It refuses to run without a private layer unless you pass `--no-private`, because without your own terms the scan passes everything that matters. Point `--ref` at what will be pushed rather than your working branch, and pass anything else that ships (a downloadable bundle, exported page copy) through `--also`: the same leak can sit in the repo, its history and a download built from an older tree at once. The contextual pass in step 4 is still yours.
 
 ## Running the scanner
 
 ```bash
-python3 scripts/leak_scan.py <path>                       # scan, medium floor (the gate)
-python3 scripts/leak_scan.py <path> --severity high       # hard blocks only
-python3 scripts/leak_scan.py <path> --json                # for a hook or CI
-python3 scripts/leak_scan.py <path> --require-private     # fail if there is no private layer
+python3 "${CLAUDE_SKILL_DIR}/scripts/leak_scan.py" <path>                       # scan, medium floor (the gate)
+python3 "${CLAUDE_SKILL_DIR}/scripts/leak_scan.py" <path> --severity high       # hard blocks only
+python3 "${CLAUDE_SKILL_DIR}/scripts/leak_scan.py" <path> --json                # for a hook or CI
+python3 "${CLAUDE_SKILL_DIR}/scripts/leak_scan.py" <path> --require-private     # fail if there is no private layer
 ```
 
 Exit codes: `0` clean, `1` findings at or above the floor, `2` bad invocation, `3` no private layer under `--require-private`.

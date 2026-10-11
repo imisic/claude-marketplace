@@ -2,7 +2,7 @@
 
 **This is a method, not a template.** You do not fill this file in. Following the steps below produces a *separate* file, your voice profile, which you keep in your own private config and point the skill at. This method file is generic and shareable; the profile it produces is personal data, so keep it private and never ship it in a public bundle.
 
-The ban catalog has a ceiling. Remove every tell from a draft and you get text that is clean, correct, and still nobody's: the model's median with the fingerprints wiped. What makes text read as a specific person was never the absence of `delve`; it is a set of habits the author does not know they have. This file is the method for extracting those habits from your real writing and turning them into a profile the Build mode can load. An hour with your own sent emails buys more authenticity than any banned-word list.
+The ban catalog has a ceiling. Remove every tell from a draft and you get text that is clean and correct but still generic, with nothing of the author in it. What makes text read as a specific person was never the absence of `delve`; it is a set of habits the author does not know they have. This file is the method for extracting those habits from your real writing and turning them into a profile the Build mode can load. An hour with your own sent emails buys more authenticity than any banned-word list.
 
 ## Step 1: gather real samples
 
@@ -30,7 +30,7 @@ Write each move as one line with one or two short real examples from your sample
 
 You are not one voice; you are one identity at different intensities. Map your real destinations (email, chat, docs, posts, specs) onto the A/B/C/D register model in `writing-with-intent.md`, and note what changes between them: where the softeners drop away, where fragments appear, where the wit is allowed out. The profile should say which moves are always on and which belong to one register only.
 
-## Step 4: set a language ceiling
+## Step 4: set a language ceiling (the vocabulary level you actually write at)
 
 This is the step most people skip and the one that catches the most ghostwriting. The model's natural register is polished, native, faintly literary English. If that is not how you write, every draft published under your name is dressed in someone else's vocabulary, and readers who know you notice even when they cannot say what is off.
 
@@ -63,10 +63,10 @@ Private. Derived <date> from <n> samples (<kinds>). Never ships in a public bund
 ## The moves
 <8-12 one-liners, each with a short example>
 
-## Register dial
+## Register dial (the tone you use for each destination)
 <destination -> register letter + which moves intensify or drop>
 
-## Language ceiling
+## Language ceiling (your vocabulary level)
 <e.g. "Write in clean C1 English: ..." with the concrete rules>
 
 ## Signature phrases (evidence, not injection)

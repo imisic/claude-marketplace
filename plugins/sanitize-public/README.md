@@ -2,16 +2,26 @@
 
 sanitize-public helps anyone publishing a plugin, repository or download check it for credentials and private details before it goes public. It scans the files and their full Git history for keys, passwords, internal hostnames, private IP addresses and home-folder paths, matches your own private names (employer, clients, internal projects) from a local list you keep, and walks a short checklist for the leaks a scanner can't see. Out of the box it knows only the generic patterns; add your own private terms to make it catch what matters to you.
 
+Installing a Claude Code plugin **copies the plugin directory onto the installer's machine**, and relative-path plugins pull in the whole marketplace repo. There is no "delete it later" once something ships. This skill turns the pre-publish check into a deterministic scan plus a short manual-review checklist, instead of something you have to remember to do by hand every time.
+
 Once it is listed, you can also add it from Anthropic's plugin directory: **Customize > Plugins** in claude.ai, or `/plugin` in Claude Code.
 
-Installing a Claude Code plugin **copies the plugin directory onto the
-installer's machine**, and relative-path plugins pull in the whole
-marketplace repo. There is no "delete it later" once something ships. This
-skill turns the pre-publish check into a deterministic scan plus a short
-manual-review checklist, instead of something you have to remember to do by
-hand every time.
+## Install
+
+```
+/plugin marketplace add imisic/claude-marketplace
+/plugin install sanitize-public@imisic
+```
+
+Then the command is `/sanitize-public:sanitize-public`.
+
+Needs Python 3 for the scanner. The full pre-push gate (`scripts/publish_gate.sh`, a set of checks that stops the push when any of them fails) also needs Git and either `gitleaks` or Docker; without one of them it reports the gitleaks layer as skipped and fails. Output is findings in the terminal.
+
+The longer write-up lives on the storefront: [ivanmisic.net/toolshed/plugins/sanitize-public](https://ivanmisic.net/toolshed/plugins/sanitize-public).
 
 ## Quickstart
+
+From a clone of this repo, in `plugins/sanitize-public/` (inside Claude Code, `/sanitize-public:sanitize-public` runs it for you):
 
 ```bash
 python3 skills/sanitize-public/scripts/leak_scan.py <artifact> --severity medium
@@ -27,7 +37,7 @@ python3 skills/sanitize-public/scripts/leak_scan.py <artifact> --severity high  
 python3 skills/sanitize-public/scripts/leak_scan.py <artifact> --json           # for a hook or CI
 ```
 
-A clean scan means the lexical layer is clean. It is not the same as "safe to
+A clean scan means the text-pattern checks found nothing. It is not the same as "safe to
 publish": run the manual-review section in
 `skills/sanitize-public/references/patterns.md` for the contextual leaks a
 regex cannot see (unreleased plans, a client named in prose, infra topology
@@ -35,9 +45,14 @@ described in words).
 
 ## The full gate
 
+Run it from anywhere, pointing `--repo` at the repository you are about to publish (its root, not a subfolder, because the gate exports the whole tree at `--ref`):
+
 ```bash
-skills/sanitize-public/scripts/publish_gate.sh --repo . --ref <what-you-will-push> --identity <public-email>
+bash /path/to/sanitize-public/skills/sanitize-public/scripts/publish_gate.sh \
+  --repo /absolute/path/to/target/repository --ref <what-you-will-push> --identity <public-email>
 ```
+
+For a Claude Code install, `/path/to/sanitize-public` is `~/.claude/plugins/cache/imisic/sanitize-public/<version>`; in a clone of this repo it is `plugins/sanitize-public`.
 
 The scanner alone reads files. The gate also scans every commit reachable from the ref you are about to push, including old blobs and commit messages, checks that every commit carries the email you mean to publish under, runs gitleaks as a second opinion on secrets, and lists binaries for you to open. Add `--also <dir>` for anything else that ships, such as an unzipped download bundle. Any finding exits 1.
 
@@ -63,7 +78,7 @@ Write each term so it matches every spelling, because code spells a project name
 
 ## Examples
 
-- `/sanitize-public plugins/my-plugin before I push it to a public repo.`
+- `/sanitize-public:sanitize-public plugins/my-plugin before I push it to a public repo.`
 - `Run publish_gate.sh on the release branch I'm about to push, with my public email as the identity.`
 - `Scan the unzipped download bundle in dist/bundle for credentials, internal hostnames and home paths.`
 
@@ -74,14 +89,3 @@ Everything runs on your machine. The scanner reads the files you point it at and
 ## Support
 
 Questions, bugs or a security concern: open an issue at https://github.com/imisic/claude-marketplace/issues, or email hello@ivanmisic.net.
-
-## Install
-
-```
-/plugin marketplace add imisic/claude-marketplace
-/plugin install sanitize-public@imisic
-```
-
-Then the command is `/sanitize-public`.
-
-The longer write-up lives on the storefront: [ivanmisic.net/toolshed/plugins/sanitize-public](https://ivanmisic.net/toolshed/plugins/sanitize-public).

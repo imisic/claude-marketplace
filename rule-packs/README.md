@@ -4,7 +4,7 @@ Public, generalized versions of the `.claude/rules/` I use across my own project
 
 ## Use
 
-Pick a pack, copy its `.md` files into your project's `.claude/rules/`. Start with `generic-rules` (stack-agnostic) and layer a language pack on top:
+Pick a pack, copy its rule files into your project's `.claude/rules/` (every `.md` except `STOREFRONT.md`, which is the website description). Each rule file's `paths:` patterns decide when it loads: a file with no `paths:` loads every session, one with patterns loads only when Claude touches a matching file. Start with `generic-rules` (works across languages and frameworks) and layer a language pack on top:
 
 | Pack | Layer | Loads |
 |-|-|-|

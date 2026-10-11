@@ -1,5 +1,11 @@
 # search-visibility changelog
 
+## 1.4.0
+
+`a-geo-optimizer` gains `scripts/geo_probe.py`, a deterministic first pass over robots.txt (per AI crawler), `llms.txt`, JSON-LD blocks and head tags. It reports evidence with a severity and exits non-zero when anything at or above `--severity` is found, so the audit starts from a candidate set instead of hand-fetching, and the model spends its reading on what a script cannot judge. Stdlib only, no network in its tests.
+
+`a-geo-optimizer` no longer states citation percentages, multipliers or word-count quotas as rules; the figures had no named source. Its llms.txt guidance now matches what Lighthouse actually checks (an H1, at least one markdown link, at least 50 characters), and `geo_probe.py` reports those as `llms-format` and its own spec heuristic separately as `llms-spec`. `a-seo-gsc` describes page+query pairs as site-wide shared-query candidates to investigate, not proof of cannibalization, and asks for a same-intent check before recommending a merge.
+
 ## 1.3.2
 
 Clearer name, description and keywords for the plugin directory. The README now opens by saying plainly what the plugin does and for whom, and its privacy section separates what the plugin does from how Claude itself handles your conversation. Skill descriptions reworded for accuracy; no behaviour changes.

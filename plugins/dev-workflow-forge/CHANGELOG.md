@@ -1,5 +1,29 @@
 # dev-workflow-forge changelog
 
+## 1.7.0
+
+Whole-tree reviews now also read everything changed since the last review, line by line. Checklists only find patterns that have already shipped, so new bug shapes in recent changes were slipping through.
+
+Three cleanup angles join the review (Reuse, Simplification, and Altitude, which asks whether a change fixes the root cause or patches a symptom), so findings whose cost is maintenance rather than a bug have a finder.
+
+Cross-file checks now compare each function's thrown exceptions with every caller's error handling, and check that sibling handlers treat the same failure the same way. The line scan carries a language-neutral pitfall list, including timestamps compared as text and input compared without normalising BOM or whitespace.
+
+Finders pass every candidate with a concrete failure scenario to verification instead of quietly dropping the ones they half believe; the full finding format applies only to what survives verification. Reports gain a Coverage line (files and bytes of diff read versus total), so an empty result over a large range cannot read as a clean one.
+
+Default scope when the tree is clean is now everything since the last review, derived from the newest date in `.claude/reviews/review-issues.jsonl`; with no log, the last 24 hours. Commits that land between reviews, including the fix for a reported finding, are no longer invisible.
+
+Each review agent now has a fixed reasoning effort as well as a model: finders run at `high`, verifiers at `medium`, so a review thinks as hard on a quiet afternoon as on a busy one. Verification is batched by file (about five candidates per verifier) with an explicit instruction to judge each candidate on its own evidence, which cuts the verify stage several times over on agents and time.
+
+`a-review-core` gains `scripts/review-scope.sh`, which resolves the review scope (explicit base, working tree, since the last review, or the last 24 hours) and the totals for the Coverage line. Every generated review skill calls it instead of carrying its own shell arithmetic, so two projects never disagree about what "since the last review" means.
+
+`review_loop_health.py --repo <name> --clusters --json` prints the qualifying clusters it counted, and `a-self-learner` now starts every run from the health verdict and that cluster list instead of re-grouping the log by hand. Its proposal template adds a third route: findings whose fix is code work rather than a rule or a check go to the project's task tracker, and the ledger records which task.
+
+`a-review-optimizer` generates `--full` flags that keep the diff angles, and points its verify prompt at the core's two depth-matched prompts. `a-rules-optimizer` states its Claude Code version measurements as floors rather than pins.
+
+`a-rules-optimizer`'s rule style guide no longer recommends `alwaysApply: true`. The always-on form is a rule with no `paths:` field; the key it used to prescribe is read only by the Cursor importer and contradicted the skill's own instructions.
+
+Generated review skills now locate `a-review-core` themselves (newest installed plugin first, then a standalone copy) and pass that directory to every core command, because the core is read as a file and skill path substitution does not apply to it. Skills that run their own scripts call them through `${CLAUDE_SKILL_DIR}`, quoted, so they work from your project directory. The scope rule in `a-review-core` keeps its incident history in `references/scope-history.md`.
+
 ## 1.6.1
 
 Clearer name, description and keywords for the plugin directory. The README now opens by saying plainly what the plugin does and for whom, and its privacy section separates what the plugin does from how Claude itself handles your conversation. Skill descriptions reworded for accuracy; no behaviour changes.
@@ -15,7 +39,6 @@ The preflight template no longer silences a crashing probe, reads non-UTF-8 file
 `a-rules-optimizer` stops recommending `alwaysApply`, which Claude Code does not read, warns that removing an `@import` can silently stop a prohibition from loading, checks the rule list an `AGENTS.md` gives other agents, and stamps each audited rule file with its audit date.
 
 `a-review-core` gives the verifier seat a smaller model, keeps each seat's configuration identical so its agents share a prompt cache, and points at the setting that keeps that cache warm across a long run.
-
 
 ## 1.5.0
 

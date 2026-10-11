@@ -187,7 +187,7 @@ All schema must be:
       "name": "What is [topic]?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Direct, complete answer in 40-80 words."
+        "text": "A direct, complete answer to the question."
       }
     },
     {
@@ -324,15 +324,16 @@ echo render_schema_jsonld($schema);
 
 ## 5. llms.txt File
 
-**Priority: LOW-MEDIUM (uneven adoption as a retrieval source, but since 2026 Lighthouse/PageSpeed Insights validates the file, so a malformed one shows up as a red audit to anyone who tests your site)**
+**Priority: LOW-MEDIUM (uneven adoption as a retrieval source, but since 2026 Lighthouse/PageSpeed Insights audits the file, so one that fails its checks shows up as a red audit to anyone who tests your site)**
 
 Place at `https://yoursite.com/llms.txt`. Markdown-formatted overview of your site for AI consumption. Takes minutes to create, costs nothing.
 
-**Format is now machine-validated.** Lighthouse's Agentic Browsing category (see section 13) parses the file as markdown and fails it unless:
-- It contains exactly the spec structure: an H1 with the site/project name (the only hard-required element), then optionally a blockquote summary, prose, and H2 sections.
-- Link entries use real markdown link syntax: `- [Name](https://url): note`. Plain `Title: URL` lines do NOT count and fail the audit with "File does not appear to contain any links".
-- The file is longer than ~50 characters.
-- Gotcha: avoid `---` horizontal-rule lines. Markdown parsers can read the first one as a YAML front-matter delimiter and discard everything above it, including the H1, so the audit reports "missing an H1 header" even though the file visibly has one.
+**Format is now machine-checked.** Lighthouse's llms-txt audit (Agentic Browsing category, see section 13) runs three regular expressions over the raw file, per its source (`core/audits/agentic/llms-txt.js` in the GoogleChrome/lighthouse repo, checked 2026-10-11). It fails the file when any of these is missing:
+- An H1 header anywhere in the file (`# Title`).
+- At least one markdown link, `[text](url)`. Plain `Title: URL` lines do not count and fail with "File does not appear to contain any links".
+- At least 50 characters.
+
+A server error when fetching the file also fails the audit; a 404 is reported as not applicable, because the file is optional. Lighthouse checks nothing else: section order, blockquotes and H2 sections are the llmstxt.org format, worth following, but not part of the audit. `geo_probe.py` reports the three Lighthouse checks as `llms-format` and its own spec heuristic (the H1 should be the first line) separately as low-severity `llms-spec`.
 
 ```markdown
 # Site Name
@@ -360,7 +361,7 @@ Optionally create `llms-full.txt`: the same overview followed by the full markdo
 
 **Priority:** LOW / optional. Future-proofing, not a required output.
 
-**Current status (as of 2026-07, per third-party trackers, not primary sources; verify before quoting):** Adoption is growing but uneven (roughly 10% of large domain samples). Some providers have confirmed support (Anthropic by late 2024, Perplexity by 2025), and by 2026 most major Western AI platforms offer partial support. The most concrete, verifiable adoption is in AI dev tools: Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Aider all fetch `/llms.txt` and `/llms-full.txt`, especially for documentation/reference sites. Google has said it does not use llms.txt for Search, and as of Q1 2026 no major AI provider (OpenAI, Google, Anthropic, Meta, Mistral) has publicly committed to reading it in production answer systems. What HAS changed: Google now validates the file in Lighthouse and PageSpeed Insights (Agentic Browsing category, section 13), which makes it a visible pass/fail checkbox for clients, tools, and audits. Bottom line: still don't prioritize it over robots.txt, schema, sitemap, or content structure, but if you ship one, it MUST follow the format rules above or it hurts you in audits.
+**Current status (as of 2026-07, per third-party trackers, not primary sources; verify before quoting):** Adoption is growing but uneven (roughly 10% of large domain samples). Some providers have confirmed support (Anthropic by late 2024, Perplexity by 2025), and by 2026 most major Western AI platforms offer partial support. The most concrete, verifiable adoption is in AI dev tools: Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Aider all fetch `/llms.txt` and `/llms-full.txt`, especially for documentation/reference sites. Google has said it does not use llms.txt for Search, and as of Q1 2026 no major AI provider (OpenAI, Google, Anthropic, Meta, Mistral) has publicly committed to reading it in production answer systems. What HAS changed: Google now validates the file in Lighthouse and PageSpeed Insights (Agentic Browsing category, section 13), which makes it a visible pass/fail checkbox for clients, tools, and audits. Bottom line: still don't prioritize it over robots.txt, schema, sitemap, or content structure, but if you ship one, make sure it passes the three Lighthouse checks above.
 
 ---
 
@@ -488,7 +489,7 @@ Chrome Lighthouse (Chrome 150+, also surfaced on pagespeed.web.dev) added an "Ag
 
 **What it checks:**
 
-1. **llms.txt presence and format**: see section 5 for the exact validation rules (H1 required, markdown `[text](url)` links required, minimum length, no `---` front-matter trap).
+1. **llms.txt presence and format**: see section 5 for the three checks (an H1, at least one markdown `[text](url)` link, at least 50 characters).
 2. **WebMCP integration**: WebMCP (Web Model Context Protocol) is a W3C proposal that lets a page expose callable tools to AI agents via `navigator.modelContext` instead of the agent guessing at the UI. Announced February 2026, in Chrome origin trial (Chrome 149-156); the main consuming agent today is Gemini in Chrome. Lighthouse verifies both declarative tools (defined in HTML) and imperative tools (registered from JS). Only relevant for interactive sites (search, cart, booking, filters); content/publishing sites can safely skip it. Reference: https://developer.chrome.com/docs/ai/webmcp
 3. **Agent-centric accessibility subset**: agents drive pages through the accessibility tree, so Lighthouse filters the a11y audits that matter for machine interaction: every interactive element has a programmatic name, ARIA roles are valid and on compatible elements, identical links have the same purpose, touch targets have sufficient size/spacing. Accessibility fixes now double as agent-readiness fixes; pitch them that way.
 4. **Layout stability (CLS)**: agents target elements by position, so layout shift breaks them the same way it annoys humans.

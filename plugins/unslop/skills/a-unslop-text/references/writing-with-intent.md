@@ -35,7 +35,7 @@ Told to "sound less like AI," a model swings the other way: staccato three-word 
 
 ## A terse register is a choice, not a tell
 
-If your default for chat and most docs is terse (short sentences, fragments for punch, the verdict first, no preamble), that can be a deliberate register, so the rhythm-variation note does not have to flag it. Do not "fix" a chosen terse register by padding it back toward the median, and do not over-correct it into performative fragments either. Hold the register; vary length within it when a thought needs room.
+If your default for chat and most docs is terse (short sentences, fragments for punch, the verdict first, no preamble), that can be a deliberate register, so the rhythm-variation note does not have to flag it. Do not "fix" a chosen terse register by padding it back toward generic model prose, and do not over-correct it into performative fragments either. Hold the register; vary length within it when a thought needs room.
 
 ## The escape hatch
 

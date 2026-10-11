@@ -31,22 +31,22 @@ Ask yourself which mode applies:
 
 ### Step 2: For full audits, follow this sequence
 
-1. **Technical foundation**: Read `references/technical-checklist.md` and verify:
+1. **Technical foundation**: Start with `python3 "${CLAUDE_SKILL_DIR}/scripts/geo_probe.py" <url> [more page URLs] --json`. It fetches robots.txt (per-crawler allow/disallow/unmentioned, Sitemap lines), `/llms.txt` and `/llms-full.txt` (presence, size, first heading, format), and every page's JSON-LD blocks (`@type` values, parse errors, missing template fields) plus `<title>`, meta description, canonical, `<html lang>` and a no-JS body-text heuristic. Its findings are evidence with a severity, never recommendations: judge that candidate set, then read `references/technical-checklist.md` and verify what the probe cannot see:
    - robots.txt allows AI crawlers (exact user-agents in `references/crawler-reference.md`)
    - Server-side rendering (critical: most AI crawlers don't execute JS)
    - Schema.org JSON-LD markup on key pages
    - Page speed (FCP < 0.4s target)
    - XML sitemap + RSS/Atom feed
    - HTTPS, mobile-friendly
-   - llms.txt file: if present it MUST pass Lighthouse validation (H1 + markdown `[text](url)` links, see checklist section 5); a malformed one is worse than none because it fails a visible audit
+   - llms.txt file: if present, it should pass Lighthouse's llms-txt audit, which checks three things: an H1 header, at least one markdown `[text](url)` link, and at least 50 characters (checklist section 5)
    - Agentic Browsing readiness (checklist section 13): run PageSpeed Insights and read the Agentic Browsing category; agent-critical a11y (programmatic names, valid ARIA, touch targets) and CLS now double as agent-readiness signals. WebMCP only matters for interactive sites (search, cart, booking)
    - If behind Cloudflare: fetch the LIVE robots.txt and check for injected Content-Signal directives (`ai-train=no` is the managed default; `ai-input=no` would hurt AI citation, see crawler-reference section 12)
 
 2. **Content structure**: Read `references/content-strategy.md` and evaluate:
    - Answer-capsule format (40-60 word direct answer after each heading)
-   - Front-loaded key content (44% of AI citations come from first 30% of page)
-   - Section length (120-180 words per self-contained section)
-   - Statistical density (one verifiable stat per 150-200 words)
+   - Front-loaded key content (the answer near the top, not after the background)
+   - Sections sized to the question each one answers
+   - Evidence where it helps the reader, with sources for any statistic
    - Question-style headings matching conversational queries
    - FAQ sections with real user questions
    - Author bios with credentials
@@ -101,7 +101,7 @@ When building PHP/HTML templates, include these by default:
 Depending on the task, produce one or more of:
 
 - **robots.txt**: Ready to deploy, with all AI crawlers allowed (see `references/crawler-reference.md` for exact user-agents)
-- **llms.txt / llms-full.txt** (optional, low-medium priority): Markdown site overview, plus an optional full-content companion. As of 2026-07 adoption as a retrieval source is still uneven: AI dev tools (Claude Code, Cursor, Copilot, Windsurf, Cline, Aider) fetch both and some providers (Anthropic, Perplexity) confirm support, but Google doesn't use it for Search and no major provider has committed to it in production answer systems. What changed in 2026: Lighthouse/PageSpeed Insights now validates the file (Agentic Browsing category), so if one exists it MUST follow the spec format (H1 required; links as markdown `- [name](url): note` bullets, never plain `Title: URL` lines; no `---` rules that get parsed as front-matter). Generate it when trivial alongside other work, notably when the site already exposes per-page markdown, since a route can then concatenate it cheaply. Don't prioritize it over robots.txt, schema, sitemap, or content.
+- **llms.txt / llms-full.txt** (optional, low-medium priority): Markdown site overview, plus an optional full-content companion. As of 2026-07 adoption as a retrieval source is still uneven: AI dev tools (Claude Code, Cursor, Copilot, Windsurf, Cline, Aider) fetch both and some providers (Anthropic, Perplexity) confirm support, but Google doesn't use it for Search and no major provider has committed to it in production answer systems. What changed in 2026: Lighthouse/PageSpeed Insights now audits the file (Agentic Browsing category) for an H1, at least one markdown link and at least 50 characters, so if one exists it should pass those checks; write links as `- [name](url): note` bullets, never plain `Title: URL` lines. Generate it when trivial alongside other work, notably when the site already exposes per-page markdown, since a route can then concatenate it cheaply. Don't prioritize it over robots.txt, schema, sitemap, or content.
 - **Schema JSON-LD blocks**: Per page type (Article, Product, FAQPage, Organization, etc.)
 - **Content restructured**: In answer-capsule format with front-loaded answers
 - **Audit report**: Findings and priority-ordered recommendations
@@ -113,15 +113,15 @@ Depending on the task, produce one or more of:
 
 1. **SSR is non-negotiable**: If content requires JavaScript to render, AI crawlers (except Googlebot) cannot see it. Always flag this.
 
-2. **Front-load answers**: The most important content goes in the first 30% of the page. AI systems extract from the top.
+2. **Front-load answers**: The most important content goes near the top of the page. AI systems tend to extract from the top.
 
 3. **Be specific, not promotional**: AI systems filter out sales copy. Use definitive, factual language with specific numbers, dates, and names. Entity density matters.
 
-4. **Earned media > owned content**: Third-party mentions are 6.5× more likely to generate AI citations than self-published content. Always recommend off-site authority building.
+4. **Earned media > owned content**: Assistants lean on third-party mentions, not just what a site says about itself. Recommend off-site authority building where the business can earn it.
 
-5. **Freshness is a hard requirement**: Content updated within 30 days accounts for 76% of AI citations. Recommend refresh cycles.
+5. **Freshness matters**: Recently updated pages are favoured, so recommend a refresh cycle for pages whose facts change, with real updates rather than date bumps.
 
-6. **Cross-platform optimization**: Only 11-14% of citations overlap between platforms. Optimize for all major AI systems, not just one.
+6. **Cross-platform optimization**: Different assistants cite different sources. Optimize for all major AI systems, not just one.
 
 7. **Don't block crawlers by accident**: Always check the LIVE robots.txt for inherited CMS/CDN blocks on AI user-agents, injected Content-Signal directives (Cloudflare's managed robots.txt defaults to `ai-train=no` on 3.8M+ domains), and CDN-level bot blocking that fires before robots.txt is read (test with `curl -A "GPTBot"`).
 
@@ -132,3 +132,4 @@ Depending on the task, produce one or more of:
 - `references/technical-checklist.md`: Complete technical implementation checklist (robots.txt, schema, sitemap, llms.txt, page speed, rendering)
 - `references/content-strategy.md`: Content formatting, answer-capsule structure, citation optimization, topic clustering
 - `references/crawler-reference.md`: All AI crawler user-agents, which platforms they serve, robots.txt templates, and platform-specific submission guides
+- `scripts/geo_probe.py`: deterministic first phase (robots.txt, llms.txt, JSON-LD, head tags), stdlib only; `--json` for phase two, exit 1 when any finding at or above `--severity` exists. The embedded crawler list mirrors `references/crawler-reference.md` sections 1 and 7, so update both together.

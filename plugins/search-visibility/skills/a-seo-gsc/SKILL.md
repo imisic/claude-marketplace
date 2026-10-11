@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # a-seo-gsc: Search Console → action plan
 
-Google Search Console already knows what is wrong with a site's search performance. This skill fetches its Performance data over the API or ingests manual exports, runs a deterministic parser, applies a full analysis playbook (adapting to the site type), and writes a prioritized action plan you can actually execute. It works on any website, not one specific project.
+Google Search Console already holds most of the signals for what is wrong with a site's search performance. This skill fetches its Performance data over the API or ingests manual exports, runs a deterministic parser, applies a full analysis playbook (adapting to the site type), and writes a prioritized action plan you can actually execute. It works on any website, not one specific project.
 
 The output is a doc: `docs/seo/YYYY-MM-DD-action-plan.md` in the target project (or wherever the user keeps analyses), plus a spoken summary of the headline finding and the top moves.
 
@@ -44,7 +44,7 @@ Give them this in full. Do not redirect them to a reference file.
 
 Everything downstream is identical. The parser cannot tell a fetched directory from an exported zip, and every analysis runs the same way on either.
 
-**Say plainly what route B costs**, once, without labouring it: page+query pairs. No Search Console export has ever contained that shape, so the true query-cannibalization section is omitted rather than reported as clean. Every other dimension is unaffected. That is the whole difference, and for a small site it is often not worth setting up an API to get.
+**Say plainly what route B costs**, once, without labouring it: page+query pairs across the whole property. The standard export lists queries and pages separately; a page-filtered export shows one page's queries at a time, which does not scale to a site-wide check. Without pairs, the shared-query section is omitted rather than reported as clean. Every other dimension is unaffected. That is the whole difference, and for a small site it is often not worth setting up an API to get.
 
 Then ask for the site's **brand terms** (name, domain, product names) so branded vs non-branded traffic can be split, and what the site is **for** (blog, ecommerce, SaaS, docs, local business) so the playbook adapts.
 
@@ -97,7 +97,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/skills/a-seo-gsc/scripts/parse_gsc.py" \
 ```
 Add `--json` to get machine output, `--out FILE` to save. Read the printed report before reasoning further; it already computes baseline, concentration, striking-distance, CTR underperformers, zero-click queries, parameter-duplicate cannibalization, coverage buckets, the index-starvation-vs-bloat diagnosis, and a categorized not-indexed list.
 
-**Page+query pairs.** A fetched directory carries `pairs.csv`, which no manual export has. It identifies true query cannibalization: which of your own pages compete for one query, and whether the page Google shows most often is the one that ranks best. Absent that file the section is omitted rather than reported as clean, because nothing was examined. Parse `current/` and `previous/` separately and diff them for the decay dimension.
+**Page+query pairs.** A fetched directory carries `pairs.csv`: page and query together across the whole property, without assembling one page-filtered export per page. It flags shared-query candidates to investigate: which of your own pages appear for one query, and whether the page Google shows most often is the one that ranks best. Absent that file the section is omitted rather than reported as clean, because nothing was examined. Parse `current/` and `previous/` separately and diff them for the decay dimension.
 
 **Search types.** A downloads folder often holds Performance exports for more than one search type (Web, Image, Video, News). They describe the same URLs from different indexes, so merging them double-counts every page and the duplicates surface as parameter cannibalization that is not real. The parser reads each export's `Filters.csv`, parses one search type, and prints on stderr what it ignored. It defaults to Web; pass `--search-type image` for another. Coverage and drilldown CSVs are never filtered, so they always come through. Read the stderr note: it tells you which dataset the numbers below it describe.
 

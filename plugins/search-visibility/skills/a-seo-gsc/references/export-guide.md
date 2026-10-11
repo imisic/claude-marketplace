@@ -6,7 +6,7 @@ For the same setup with an explanation of what each step does, read the [full Se
 
 ## Prefer the API for Performance
 
-`scripts/fetch_gsc.py` pulls the whole Performance half over the API, so export 1 below is only needed when the API is not set up for a property. The API also adds data: the UI export caps its query and page tables near 1000 rows while the API returns up to 25,000 top rows per request, it writes a matching previous window so trend analysis always runs, and it returns **page+query pairs**, a shape no export has ever contained and the only way to prove true cannibalization. Google does not guarantee every row through the API, even with pagination, so treat it as a larger and more useful sample rather than a complete copy of every search.
+`scripts/fetch_gsc.py` pulls the whole Performance half over the API, so export 1 below is only needed when the API is not set up for a property. The API also adds data: the UI export caps its query and page tables near 1000 rows while the API returns up to 25,000 top rows per request, it writes a matching previous window so trend analysis always runs, and it returns **page+query pairs** across the whole property, which a manual route can only assemble one page-filtered export at a time. Pairs flag pages that share a query; they are candidates to investigate, not proof that the pages compete. Google does not guarantee every row through the API, even with pagination, so treat it as a larger and more useful sample rather than a complete copy of every search.
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/skills/a-seo-gsc/scripts/fetch_gsc.py" \

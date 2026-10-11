@@ -5,7 +5,7 @@ description: "Remove generic, padded or machine-written phrasing while keeping t
 
 # a-unslop-text
 
-Read this first, because the common misunderstanding sinks the whole thing.
+This skill checks writing for the patterns that make it read as machine-written and helps you revise it. The scanner is `python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" <path>`; the manual review covers what a scanner cannot see.
 
 **This skill does not write well for you, and it does not impose a single house voice.** It does two narrow things. It removes the specific cues that make text read as machine-written, and where the text reads as AI because nobody chose a voice, it forces a deliberate, register-appropriate one. The argument and what you actually want to say are still yours. A guardrail is not a writer.
 
@@ -29,20 +29,20 @@ Detectors return a probability and are wrong often enough to ruin a real writer'
 
 ## Build mode
 
-Most "sounds like AI" outcomes are a specification problem, not a wording one. An unspecified prompt gets the model's median voice. So before drafting anything for a reader, pin the register (A casual / B conversational-professional / C expository / D formal), then a speaker inside it, then state the claim in a sentence. `references/writing-with-intent.md` is the method. Then write, avoiding the tells in `references/tells.md`.
+Most "sounds like AI" outcomes are a specification problem, not a wording one. A prompt that sets no tone or audience gets the model's most generic voice. So before drafting anything for a reader, choose the register (how formal the writing is) (A casual / B conversational-professional / C expository / D formal), then a speaker inside it, then state the claim in a sentence. `references/writing-with-intent.md` is the method. Then write, avoiding the tells in `references/tells.md`.
 
-The ban list alone gets you to clean, not to you. So before drafting under a real person's byline, check whether they have a voice profile (moves extracted from their real pre-AI writing, a register dial, a language ceiling); ask if you don't know. If they do, the speaker step is already answered: load the profile and hold it. If they don't, do not silently produce generic text under their name. Offer the choice: build one now with them (about an hour following `references/voice-profile.md`, and it moves a draft further toward its author than everything else in this skill combined), or proceed and say plainly the result will read as clean, not as them. Keep any resulting profile private; the method is shareable, the output is personal data.
+The ban list alone gets you to clean, not to you. So before drafting under a real person's byline, check whether they have a voice profile: a short file describing the phrasing habits in their own writing from before they used AI, the tone they use for each destination, and the vocabulary level they write at. Ask if you don't know. If they do, the speaker step is already answered: load the profile and hold it. If they don't, do not silently produce generic text under their name. Offer the choice: build one now with them (about an hour following `references/voice-profile.md`, and it moves a draft further toward its author than everything else in this skill combined), or proceed and say plainly the result will read as clean, not as them. Keep any resulting profile private; the method is shareable, the output is personal data.
 
-If you already have a default register for chat and most docs (say, terse: verdict first, short sentences, fragments for punch, no preamble), that is a chosen register, not the model's default, so hold it. Do not pad it back toward the median, and do not over-correct it into performative fragments.
+If you already have a default register for chat and most docs (say, terse: verdict first, short sentences, fragments for punch, no preamble), that is a chosen register, not the model's default, so hold it. Do not pad it back toward generic model prose, and do not over-correct it into performative fragments.
 
 ## Audit mode
 
 When reviewing or cleaning existing prose, or on "does this sound like AI / de-slop this / make it sound like me," run the scanner first, then fix in priority order.
 
 ```bash
-python3 scripts/unslop_text_scan.py <path>                 # report + slop score
-python3 scripts/unslop_text_scan.py <path> --severity high # only the hard bans (gated tier)
-python3 scripts/unslop_text_scan.py <path> --json          # for CI
+python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" <path>                 # report + slop score
+python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" <path> --severity high # only the hard bans (gated tier)
+python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" <path> --json          # for CI
 ```
 
 It scans `.md .markdown .mdx .txt .rst .html`, reports each finding with file, line, the matched text, and the fix, plus a configured-style score and a density per 1,000 authored words (quoted lines are excluded from the denominator, so a piece that is mostly quotation is not diluted). Exit code is `1` when any high-severity violation exists, `0` when none exists, and `2` for invalid input, so CI can gate on it.

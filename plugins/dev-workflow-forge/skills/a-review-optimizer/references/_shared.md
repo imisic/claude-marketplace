@@ -19,3 +19,7 @@ diff -q references/pattern-detection.md ../a-rules-optimizer/references/pattern-
 ```
 
 Both should print nothing. If they diverge, pick the authoritative version and sync.
+
+## Deliberately not shared: the project-profiling step
+
+The project-profiling step is duplicated on purpose (`a-review-optimizer/SKILL.md` Phase 2, inline bash; `a-rules-optimizer/SKILL.md` Phase 1, an Explore brief). The two execution paths differ, and a shared file would have to ship into both skills anyway, so each keeps its own. Audited 2026-10-11 (decision D2); do not re-raise.

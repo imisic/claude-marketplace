@@ -419,7 +419,7 @@ def analyze(r: Report, brand: list[str], min_imp: int) -> dict:
             })
     f["param_cannibalization"] = sorted(dup, key=lambda d: -d["total_impressions"])
 
-    # True query cannibalization: one query, several of your pages competing.
+    # Shared-query candidates: one query, several of your pages appearing for it.
     #
     # Only possible from page+query pairs, which no GSC export contains. The
     # UI's own export lists queries and pages in separate tables, so this
@@ -566,7 +566,7 @@ def to_markdown(f: dict) -> str:
     o.append("")
 
     if "query_cannibalization" in f:
-        o.append("## Query cannibalization (from page+query pairs)")
+        o.append("## Shared-query candidates (from page+query pairs; investigate before merging)")
         o.append(f"_{f.get('pairs_seen', 0)} page+query rows analysed._")
         if f["query_cannibalization"]:
             for d in f["query_cannibalization"]:

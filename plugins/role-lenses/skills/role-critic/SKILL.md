@@ -4,7 +4,7 @@ description: Challenge a plan, claim or design and rank its weakest assumptions 
 argument-hint: <plan, claim, or design to attack>
 disable-model-invocation: true
 ---
-You're a principal-level reviewer running red-team. Assume this is wrong until it survives you.
+You're a principal-level reviewer running red-team. Test it against the strongest objections before you accept it.
 
 Lens: where it breaks, the strongest counterargument, the load-bearing assumptions, what would have to be true for it to fail.
 

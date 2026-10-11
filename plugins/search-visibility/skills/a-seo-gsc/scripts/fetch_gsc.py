@@ -14,11 +14,12 @@ What this CANNOT fetch, because no API serves it:
     manual export.
   - the Links report. No API at all.
 
-What it fetches that no export can give you:
-  - page+query PAIRS, which is the only way to prove true cannibalization.
-    Google's UI export lists queries and pages in separate tables, so the
-    question "which of my pages compete for this query" has never been
-    answerable from an export.
+What it fetches that the standard exports do not give you:
+  - page+query PAIRS across the whole property. Google's standard export
+    lists queries and pages in separate tables, and a page-filtered export
+    covers one page at a time, so a site-wide "which of my pages share this
+    query" check is impractical from exports. Shared queries are candidates
+    to investigate, not proof that the pages compete.
   - a second, immediately preceding window of equal length, so decay analysis
     works without anyone remembering to tick Compare in the UI.
 

@@ -1,5 +1,9 @@
 # dev-loop changelog
 
+## 1.3.2
+
+Documentation only: full command names (`/dev-loop:fix`), plainer wording, and installation at the top of the README. No behaviour changes.
+
 ## 1.3.1
 
 Clearer name, description and keywords for the plugin directory. The README now opens by saying plainly what the plugin does and for whom, and its privacy section separates what the plugin does from how Claude itself handles your conversation. Skill descriptions reworded for accuracy; no behaviour changes. `/ship` is now described correctly: it pauses once, after the review, not before every step.

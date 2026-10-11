@@ -1,5 +1,9 @@
 # sanitize-public changelog
 
+## 1.2.2
+
+The skill now calls its scanner through `${CLAUDE_SKILL_DIR}`, so it runs from your project directory. The history section of `references/patterns.md` points at `publish_gate.sh` instead of a per-term `git log -S` loop, matching the skill itself. The README and storefront open with installation and requirements and separate the file scan from the history scan.
+
 ## 1.2.1
 
 Clearer name, description and keywords for the plugin directory. The README now opens by saying plainly what the plugin does and for whom, and its privacy section separates what the plugin does from how Claude itself handles your conversation. Skill descriptions reworded for accuracy; no behaviour changes.

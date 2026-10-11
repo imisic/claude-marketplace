@@ -53,14 +53,7 @@ layer, never leads it.
 
 ## Git history (when the artifact's `.git` ships too)
 
-The scanner only reads the current working tree. If the shipping artifact
-still has its `.git` directory (a repo pushed as-is, a tarball that forgot to
-strip it), a term can be gone from the tree today and still sit in an old
-commit or diff. For every medium-or-higher rule above, run `git log --all
--S"<term>" --oneline | head -5` from the repo root. Any hit means the term is
-reachable by anyone who clones the repo, even if `HEAD` is clean. The fix is
-a history rewrite or, usually cheaper, a fresh-history repo: new `git init`,
-one clean commit, the old repo stays private.
+The scanner only reads the current working tree. If the shipping artifact still has its `.git` directory (a repo pushed as-is, a tarball that forgot to strip it), a term can be gone from the tree today and still sit in an old commit. Run `scripts/publish_gate.sh` on the ref you will push: it scans every blob reachable from that ref, plus commit messages and authors, in one pass. Use `git log --all -S"<term>"` only afterwards, to find the commit behind a specific hit, and read it before concluding anything, because `-S` also lists the commit that removed the term. A real hit means a history rewrite or, usually cheaper, a fresh-history branch with one clean commit. If the commit is already on a public remote, a rewrite narrows the exposure; it does not undo it.
 
 ## Manual review (the scanner cannot see these)
 

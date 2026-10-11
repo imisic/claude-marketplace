@@ -24,3 +24,7 @@ Both should print nothing. If they diverge, pick the authoritative version and s
 
 Symlinks silently break on some filesystems (NTFS without Developer Mode, some synced drives) and hide the dependency; an editor sees one file and doesn't realize changes propagate. Explicit duplication with this note makes the coupling visible.
 
+
+## Deliberately not shared: the project-profiling step
+
+The project-profiling step is duplicated on purpose (`a-review-optimizer/SKILL.md` Phase 2, inline bash; `a-rules-optimizer/SKILL.md` Phase 1, an Explore brief). The two execution paths differ, and a shared file would have to ship into both skills anyway, so each keeps its own. Audited 2026-10-11 (decision D2); do not re-raise.

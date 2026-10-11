@@ -4,7 +4,7 @@
     "name": "Ivan Misic",
     "url": "https://ivanmisic.net"
   },
-  "description": "Ivan Misic's Claude Code tools: senior-review lenses, skills, and workflow commands.",
+  "description": "Ivan Misic's Claude Code tools for code review, bug fixes, commits, pre-publish leak checks, search visibility and AI-writing checks.",
   "plugins": [
     {
       "name": "role-lenses",
@@ -32,7 +32,7 @@
     {
       "name": "dev-workflow-forge",
       "source": "./plugins/dev-workflow-forge",
-      "description": "Generate a code review skill and coding rules fitted to your own repository, then improve them from what your reviews keep finding. Every proposed change waits for your approval.",
+      "description": "Generate a code review skill and coding rules fitted to your own repository, then improve them from what your reviews keep finding. You start each generator yourself, and the learning loop asks before it applies any change.",
       "category": "workflow",
       "author": {
         "name": "Ivan Misic",

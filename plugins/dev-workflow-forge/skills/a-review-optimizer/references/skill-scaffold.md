@@ -22,7 +22,7 @@ A mature skill exposes a small, stable set of scope/depth flags. Emit only the o
 | Flag | Behavior |
 |-|-|
 | `--changed` | Default. Review only files changed since HEAD (`git diff --name-only HEAD`) |
-| `--full` | Review the whole source tree + architecture diagrams + health score |
+| `--full` | Every dimension over the whole source tree, plus the core's diff angles over everything changed since the last review (+ architecture diagrams + health score where the project has them) |
 | `--security-only` | Run the Security agent alone |
 | `--debt` | Add tech-debt scoring, stricter thresholds, and extra checks to every agent |
 | `--all` | `--full` + `--debt` combined (most thorough) |
@@ -32,6 +32,7 @@ Flags combine where logical (e.g. `--security-only --debt`).
 
 Guidance:
 - `--changed` is always the default. State the exact git command so the skill is deterministic about scope.
+- `--full` never says "no diff angles". `a-review-core` §4 runs the mechanism and cleanup angles over the since-last-review diff inside a full run, because checklists only find patterns that have already shipped; a project may drop that half only by recording the reason in its flag table. Point at the core for the mechanics rather than restating them (a generated skill whose `--full` said "no diff angles" missed four real bugs in files changed that week).
 - `--debt` is a *modifier*, not a separate scope: it lowers thresholds (file-length, function-length) and turns on extra checks that are too noisy for every run.
 - Only ship `--full`'s diagram half if the project has a real layered architecture to draw. A 3-file script doesn't.
 

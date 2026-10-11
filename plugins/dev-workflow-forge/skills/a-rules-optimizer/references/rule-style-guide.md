@@ -15,22 +15,19 @@ paths:
 ---
 ```
 
-### Always-Applied (rare, for project-wide architecture rules)
-```yaml
----
-alwaysApply: true
----
-```
+### Always-On (rare, for project-wide architecture rules)
 
-Use `alwaysApply` only for rules that genuinely matter regardless of which file is being edited (e.g., architecture layer rules, fundamental conventions). Default to `paths:` scoping.
+No `paths:` field. A rule file without one loads every session, with or without a frontmatter block. Claude Code has no marker key for this; a Cursor-style always-on key is legacy noise that only the `.cursor` importer reads, so never add one (SKILL.md Phase 2e names it).
 
-That default holds for reference material only. `paths:` fires when Claude **reads** a matching file and stays silent when it **writes** one, so prohibitions, access inventories, and any rule governing a write-heavy workflow belong in `alwaysApply: true` however large they are. Shrink those rather than scoping them. Full decision rule and the measured trigger behavior: SKILL.md Phase 2e.
+Leave a rule unscoped only when it genuinely matters regardless of which file is being edited (e.g., architecture layer rules, fundamental conventions). Default to `paths:` scoping.
+
+That default holds for reference material only. `paths:` fires when Claude **reads** a matching file and stays silent when it **writes** one, so prohibitions, access inventories, and any rule governing a write-heavy workflow stay unscoped however large they are. Shrink those rather than scoping them. Full decision rule and the measured trigger behavior: SKILL.md Phase 2e.
 
 ### Additional frontmatter notes
 
 - **Two `paths:` forms are equally valid:** the block-list form above and an inline comma-separated form (`paths: app/**/*.php, public/index.php, composer.json`). They behave identically. Match whichever the existing rule set already uses; don't rewrite one into the other during an audit.
 - **`paths:` entries can be exact files, not just globs.** A subsystem rule scopes cleanly to the handful of files that implement it: `paths: src/consolidator.py`, or `paths: app/src/Core/FeatureFlags.php, app/src/Services/OAuthService.php, .env`. The rule loads exactly when those files are edited and stays out of context otherwise.
-- **`security.md` is the canonical always-on file.** Security review applies to every source file, so mark it `alwaysApply: true` or scope it to all source (`src/**/*.py`, `app/**/*.php`). Every mature rule set has exactly one always-on security file.
+- **`security.md` is the canonical always-on file.** Security review applies to every source file, so leave it unscoped (no `paths:`) or scope it to all source (`src/**/*.py`, `app/**/*.php`). Every mature rule set has exactly one always-on security file.
 
 ## Scoping Guidelines
 

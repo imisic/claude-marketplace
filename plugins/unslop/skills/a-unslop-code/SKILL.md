@@ -83,9 +83,9 @@ Order matters, because the scanner is blind to the worst tell.
 2. **Run the scanner** for the surface tells.
 
    ```bash
-   python3 scripts/unslop_code_scan.py <path>                 # report + slop score
-   python3 scripts/unslop_code_scan.py <path> --severity high # strongest only
-   python3 scripts/unslop_code_scan.py <path> --json          # for CI
+   python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_code_scan.py" <path>                 # report + slop score
+   python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_code_scan.py" <path> --severity high # strongest only
+   python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_code_scan.py" <path> --json          # for CI
    ```
 
    It covers Python, JS/TS, Java, Go, Rust, Ruby, PHP, C/C++, C#, and more. Each finding

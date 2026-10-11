@@ -11,10 +11,10 @@ The Python layer that sits on top of the generic pack. Broad `paths:` globs (`**
 **What's inside**
 
 - `python-standards.md`: modern type hints (`X | None`, lowercase generics), naming, module-level logging with no `print()`, specific-exception handling, no mutable defaults, no `import *`, linting.
-- `python-security.md`: subprocess safety (no `shell=True`, list args, `timeout=`), `yaml.safe_load` and the no-`pickle`/no-`eval` deserialization rules, SSRF validation on outbound requests with a post-redirect re-check, ReDoS-safe regex on untrusted input, secrets via `os.getenv`, tar-extraction and temp-file safety.
+- `python-security.md`: subprocess safety (no `shell=True`, list args, `timeout=`), `yaml.safe_load` and the no-`pickle`/no-`eval` deserialization rules, server-side request forgery (SSRF) validation on outbound requests with a re-check after redirects, regular-expression denial-of-service (ReDoS) safe patterns on untrusted input, secrets via `os.getenv`, tar-extraction and temp-file safety.
 
 **How to use**
 
-Download and drop the `.md` files into `.claude/rules/` alongside the generic pack. They load whenever you touch a `.py` file. The security file is drawn from scraper and data-pipeline projects, so it leans on the network and deserialization surfaces those hit hardest.
+Download the pack and copy its rule files (`python-security.md` and `python-standards.md`) into `.claude/rules/` alongside the generic pack. If you copy from a clone of the GitHub repo instead, leave out `STOREFRONT.md`; it is the website description, not a rule, and the download does not include it. They load whenever you touch a `.py` file. The security file is drawn from scraper and data-pipeline projects, so it leans on the network and deserialization surfaces those hit hardest.
 
 Want these tuned to your actual codebase? Run `/a-rules-optimizer` from the dev-workflow-forge plugin.

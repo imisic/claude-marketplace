@@ -135,7 +135,7 @@ OUTPUT RULES:
 
 ## Verifier Output Constraint
 
-The verify stage returns a verdict per candidate, not a rewritten finding. Include this in the verifier prompt, and pick the closing line to match the run's effort level (see `skill-scaffold.md` "Verify calibration"):
+The verify stage returns a verdict per candidate, not a rewritten finding. Include this in the verifier prompt, and pick the closing line to match the run's effort level (see `a-review-core/SKILL.md` §6 Verify, "Two prompts, chosen by depth"):
 
 ```
 For the candidate below, return exactly one verdict:

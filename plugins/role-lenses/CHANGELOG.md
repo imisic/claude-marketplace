@@ -1,5 +1,13 @@
 # role-lenses changelog
 
+## 1.1.3
+
+The critic now tests a position against the strongest objections before accepting it, rather than assuming it is wrong. The README and storefront describe the eight roles in plainer words and use full command names (`/role-lenses:role-critic`). No other behaviour changes.
+
+## 1.1.2
+
+`/role-architect` now covers framework choice when the stack is still undecided, and steps back from it once a suitable stack exists. No other changes.
+
 ## 1.1.1
 
 Clearer name, description and keywords for the plugin directory. The README now opens by saying plainly what the plugin does and for whom, and its privacy section separates what the plugin does from how Claude itself handles your conversation. Skill descriptions reworded for accuracy; no behaviour changes.

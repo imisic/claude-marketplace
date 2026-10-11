@@ -20,7 +20,7 @@ evidence:
 
 rationale:         <why this warrants a preventive change, 1-3 sentences tied to the evidence>
 
-target_skill:      <a-rules-optimizer | a-review-optimizer>
+target_skill:      <a-rules-optimizer | a-review-optimizer | tracker>
 target_file:       <specific file the target skill should modify>
 proposed_change:   <concrete diff or rule text, NOT a description>
 
@@ -39,6 +39,7 @@ re_propose_if:     <condition that would justify re-raising if rejected>
 | Review skill's capture calls | `a-review-optimizer` | Scaffolding a project's capture mechanism: the review SKILL.md must call `capture-finding.sh` per confirmed finding. `a-self-learner` drops the helper script, but wiring calls into the review skill is `a-review-optimizer`'s edit. |
 | Review skill's `KNOWN CORRECT PATTERNS` section | `a-review-optimizer` | False-positive whitelist additions. |
 | Review skill's agent prompt | `a-review-optimizer` | New checks that require LLM judgment (not mechanical). |
+| The project's task tracker (an issue or task in whatever the project uses) | `tracker` | The fix is code work, not a rule or a check: a runtime guard no grep can decide, a conformance fixture, a refactor that removes the pattern at source. The ledger row reads `Applied via: tracker` and names the task id, so the next run can tell "fixed in code" from "never addressed". |
 
 **When ambiguous, prefer `a-rules-optimizer` over `a-review-optimizer`.** Rules prevent at write-time; preflight catches at review-time. Prevention is cheaper.
 

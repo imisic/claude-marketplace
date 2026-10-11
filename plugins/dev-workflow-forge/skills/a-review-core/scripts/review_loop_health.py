@@ -11,6 +11,8 @@ Usage:
     review_loop_health.py                  # table, worst first
     review_loop_health.py --json           # machine output
     review_loop_health.py --repo myproject # one repo in detail
+    review_loop_health.py --repo myproject --clusters [--json]  # every qualifying cluster, the list a-self-learner judges
+    review_loop_health.py --clusters       # the same for each OVERDUE repo
     review_loop_health.py --root ~/work    # scan somewhere else
 """
 
@@ -127,6 +129,39 @@ def glob_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
     return sorted(set(found))
 
 
+def cluster_findings(open_findings: list[dict], resolutions: list[dict]) -> list[dict]:
+    """The one definition of a qualifying cluster. The CLUST column, the OVERDUE verdict and --clusters all read this list, so a-self-learner judging the --clusters output is judging the same set the fleet table counted."""
+    # `covered` is advisory for the learn pass: the newest resolution row sharing the category says someone already acted on this slug, which a-self-learner must weigh as possible re-emergence rather than a fresh pattern. It never removes the cluster, because the rows in it are by construction the ones that resolution did not account for.
+    covered_on: dict[str, str] = {}
+    for row in resolutions:
+        category = str(row.get("category") or "")
+        if not category:
+            continue
+        day = str(row.get("date") or "")
+        covered_on[category] = max(covered_on.get(category, ""), day if valid_date(day) else "")
+
+    by_category: dict[str, list[dict]] = defaultdict(list)
+    for row in open_findings:
+        by_category[str(row.get("category") or "(uncategorized)")].append(row)
+    clusters: list[dict] = []
+    for category, group in by_category.items():
+        group_dates = sorted({str(r.get("date")) for r in group if valid_date(str(r.get("date") or ""))})
+        if len(group) >= CLUSTER_MIN_FINDINGS and len(group_dates) >= CLUSTER_MIN_DATES:
+            clusters.append({
+                "category": category,
+                "count": len(group),
+                "dates": len(group_dates),
+                "first": group_dates[0],
+                "last": group_dates[-1],
+                "files": len({str(r.get("file") or "") for r in group}),
+                # A resolution row without a usable date still counts as cover, so the value is the date when known and "undated" otherwise, never a bare True that would hide the distinction.
+                "covered": (covered_on[category] or "undated") if category in covered_on else None,
+                "finding_ids": [str(r.get("finding_id")) for r in group if r.get("finding_id")],
+            })
+    clusters.sort(key=lambda c: (-c["count"], c["category"]))
+    return clusters
+
+
 def scan_repo(repo: Path, today: date) -> dict:
     claude = repo / ".claude"
     log = claude / "reviews" / "review-issues.jsonl"
@@ -230,20 +265,7 @@ def scan_repo(repo: Path, today: date) -> dict:
     open_findings = [r for r in findings if not processed(r)]
     info["unprocessed"] = len(open_findings)
 
-    by_category: dict[str, list[dict]] = defaultdict(list)
-    for row in open_findings:
-        by_category[str(row.get("category") or "(uncategorized)")].append(row)
-    for category, group in by_category.items():
-        group_dates = sorted({str(r.get("date")) for r in group if valid_date(str(r.get("date") or ""))})
-        if len(group) >= CLUSTER_MIN_FINDINGS and len(group_dates) >= CLUSTER_MIN_DATES:
-            info["clusters"].append({
-                "category": category,
-                "count": len(group),
-                "dates": len(group_dates),
-                "first": group_dates[0],
-                "last": group_dates[-1],
-            })
-    info["clusters"].sort(key=lambda c: (-c["count"], c["category"]))
+    info["clusters"] = cluster_findings(open_findings, resolutions)
 
     if not info["clusters"]:
         info["verdict"] = "OK"
@@ -290,6 +312,26 @@ def flag(value) -> str:
     return "yes" if value else "no"
 
 
+def print_aligned(rows: list[tuple[str, ...]]) -> None:
+    """Header row first; a dash rule follows it, then the data rows."""
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    for index, row in enumerate(rows):
+        print("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)).rstrip())
+        if index == 0:
+            print("  ".join("-" * w for w in widths))
+
+
+def print_clusters(r: dict) -> None:
+    if not r["clusters"]:
+        print("(no cluster qualifies)")
+        return
+    rows = [("CATEGORY", "COUNT", "DATES", "FIRST", "LAST", "FILES", "COVERED")]
+    for c in r["clusters"]:
+        rows.append((c["category"], str(c["count"]), str(c["dates"]), c["first"], c["last"],
+                     str(c["files"]), c["covered"] or "-"))
+    print_aligned(rows)
+
+
 def print_table(reports: list[dict]) -> None:
     header = ("REPO", "VERDICT", "SCHEMA", "FIND", "RES", "UNPROC", "CLUST",
               "LAST-REVIEW", "LAST-LEARN", "AGE", "SKILL", "INJ", "STAMP")
@@ -303,11 +345,7 @@ def print_table(reports: list[dict]) -> None:
             f"{age}d" if age is not None else "-",
             flag(r["review_skills"]), flag(r["inj_files"]), flag(r["optimizer_stamp_files"]),
         ))
-    widths = [max(len(row[i]) for row in rows) for i in range(len(header))]
-    for index, row in enumerate(rows):
-        print("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)).rstrip())
-        if index == 0:
-            print("  ".join("-" * w for w in widths))
+    print_aligned(rows)
     print()
     print(f"{len(reports)} repo(s) with .claude/. UNPROC counts findings with no recorded resolution; CLUST counts "
           f"unprocessed categories with >={CLUSTER_MIN_FINDINGS} findings across >={CLUSTER_MIN_DATES} dates. "
@@ -362,6 +400,8 @@ def main() -> int:
     parser.add_argument("--root", default="~/Projects", help="directory to scan (default: ~/Projects)")
     parser.add_argument("--repo", help="inspect one repo by directory name")
     parser.add_argument("--json", action="store_true", dest="as_json", help="machine-readable output")
+    parser.add_argument("--clusters", action="store_true",
+                        help="list every qualifying cluster (the CLUST set) for --repo, or for each OVERDUE repo")
     args = parser.parse_args()
 
     root = Path(args.root).expanduser()
@@ -381,6 +421,23 @@ def main() -> int:
             return 0
 
     reports = sorted((scan_repo(repo, today) for repo in repos), key=sort_key)
+
+    if args.clusters:
+        # Without --repo only OVERDUE repos are listed: an OK repo's clusters are already covered by its last learning, and NO-CAPTURE has none.
+        chosen = reports if args.repo else [r for r in reports if r["verdict"] == "OVERDUE"]
+        if args.as_json:
+            # `repo` rides on every object so the fleet-mode array stays self-describing when several repos are concatenated.
+            print(json.dumps([{"repo": r["repo"], **c} for r in chosen for c in r["clusters"]], indent=2))
+            return 0
+        if not chosen:
+            print(f"no OVERDUE repo under {root}")
+            return 0
+        for index, report in enumerate(chosen):
+            if index:
+                print()
+            print(f"{report['repo']}  ({report['verdict']}: {report['reason']})")
+            print_clusters(report)
+        return 0
 
     if args.as_json:
         print(json.dumps({"generated": today.isoformat(), "root": str(root), "repos": reports}, indent=2))

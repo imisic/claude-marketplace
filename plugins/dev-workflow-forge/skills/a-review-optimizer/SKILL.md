@@ -450,7 +450,14 @@ The from-scratch workflow:
 2. **Phase 2: FULL**: this is now your primary input. Read the code carefully; conventions you miss here become gaps you won't catch.
 3. **Phase 3: SKIP gap-against-existing**: there's no baseline. Instead, treat `references/review-dimensions.md` as the complete checklist and decide which dimensions this project actually needs (a CLI-only Python tool doesn't need a "Web Patterns" agent; a static site doesn't need SSRF checks).
 4. **Phase 4: Build an overlay, not a whole skill, and not from a generic template.**
-   - Open the generated skill by reading the `a-review-core` skill in full. Everything below that line is this project's overlay.
+   - Open the generated skill by locating and reading the `a-review-core` skill in full. Everything below that step is this project's overlay. The core is read as a file, so the generated skill must find its directory itself; emit this as its first step:
+     ```bash
+     # Newest installed dev-workflow-forge first, then a standalone copy in the personal skills directory.
+     ls -d ~/.claude/plugins/cache/*/dev-workflow-forge/*/skills/a-review-core 2>/dev/null | sort -V | tail -1
+     ls -d ~/.claude/skills/a-review-core 2>/dev/null
+     ```
+     Then read `<that directory>/SKILL.md` and use the same literal directory wherever the core writes `<core-dir>`. If neither command prints a path, stop and say the core is not installed rather than reviewing without it.
+     When improving an existing generated skill that opens by reading the core without this step, add it.
    - Write nothing the core already covers. If you find yourself explaining dispatch, verify verdicts, the finding contract or the report skeleton, stop: that is the engine.
    - Decide how many agents make sense (2-4, based on project complexity, don't over-fragment).
    - Assign scopes based on Phase 2 findings + the dimensions you kept from Phase 3. Scopes must be non-overlapping.

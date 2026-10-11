@@ -2,13 +2,13 @@
 
 Read this after any improve or from-scratch pass, before claiming the skill got better. Until a round has run, "the review skill now catches more" is an opinion.
 
-The problem it solves: this skill rewrites another skill and then hands it back with no measurement. Plant defects the fleet has actually shipped, run the review, count how many it found. That turns "did the optimizer help" into two numbers you can put side by side.
+The problem it solves: this skill rewrites another skill and then hands it back with no measurement. Plant defects the author's projects have actually shipped, run the review, count how many it found. That turns "did the optimizer help" into two numbers you can put side by side.
 
 ## Parts
 
 | Path | What it is |
 |-|-|
-| `benchmarks/corpus.json` | 22 defects, 11 PHP and 11 Python, each one a real past finding mined from the fleet review logs |
+| `benchmarks/corpus.json` | 22 defects, 11 PHP and 11 Python, each one a real past finding mined from the author's project review logs |
 | `scripts/seed-defects.py` | The harness: list, plant, verify, score, restore. Standard library only, no venv |
 | `benchmarks/test-guards.sh` | Regression test for the harness: asserts every guard refuses, exits 1 if one stops refusing |
 
@@ -126,7 +126,7 @@ Seeds sit two blank lines apart, so a raw `+/-3` window would reach into the nei
 
 Say this out loud in any report that quotes a benchmark number, because the number invites more confidence than it earns.
 
-- **It measures recall on known defect classes only.** Twenty-two categories, all of them things the fleet already caught at least once. A review skill that scores 1.00 has proven it catches defects that were already in the logs. It has proven nothing about the next novel bug, and novel bugs are most of what a review is for.
+- **It measures recall on known defect classes only.** Twenty-two categories, all of them things those projects already caught at least once. A review skill that scores 1.00 has proven it catches defects that were already in the logs. It has proven nothing about the next novel bug, and novel bugs are most of what a review is for.
 - **The seeds are synthetic instances of real categories, not the real code.** A real `wrong-array-key-silent-fallback` finding usually needs the reviewer to know which columns a repository method selects, in a file far from where the key is read. The seed hands it a self-contained function where the mismatch is visible in six lines. Recall on the seed overstates recall on the real thing.
 - **Optimizing a review skill to score well on a fixed corpus is overfitting, and it will happen if you let it.** Adding a grep for `benchNotificationLanguage`, or a check tuned to the exact shape of a seed, raises the score and improves nothing. The corpus is a smoke test, not a target. If a round shows a miss, fix the underlying dimension so the skill would also catch the original finding the seed came from, then re-run.
 - **Appended code is easier than embedded code.** The seed sits at the end of a file with no surrounding context to distract the reviewer. Real defects hide in the middle of a 400-line class.

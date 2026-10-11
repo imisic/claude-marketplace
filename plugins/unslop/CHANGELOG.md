@@ -1,5 +1,9 @@
 # unslop changelog
 
+## 1.4.3
+
+The skills now call their scanners through `${CLAUDE_SKILL_DIR}`, so they run from your project directory instead of depending on the current working directory. The README opens with installation and requirements, uses full command names (`/unslop:a-unslop-text`), and explains the tools in plainer words.
+
 ## 1.4.2
 
 Clearer name, description and keywords for the plugin directory. The README now opens by saying plainly what the plugin does and for whom, and its privacy section separates what the plugin does from how Claude itself handles your conversation. Skill descriptions reworded for accuracy; no behaviour changes.
