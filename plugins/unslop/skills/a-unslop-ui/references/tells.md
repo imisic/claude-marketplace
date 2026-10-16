@@ -1,67 +1,75 @@
 # AI-website tells: the catalog
 
-The human-readable view. The scanner (`scripts/devibe_scan.py`) is the enforced layer for the mechanical tells; this file explains them, gives the code signatures, and lists the ones only your eyes catch. The ranking comes from the research credited in `SKILL.md`; the structure and prose here are this skill's.
+The scanner (`scripts/devibe_scan.py`) enforces mechanical signatures; human review decides whether they fit the brief. A tell is a reason to inspect a choice, not proof of AI authorship. Severity reflects judged risk and pattern precision, not complaint frequency. HIGH findings gate CI; MEDIUM and LOW are advisory. Sources below were checked or carried forward in 2026-10, not necessarily published then.
 
-The loudest complaint in the data is not any single feature. It is that the sites are recognizable on sight, "they all look the same." Among specific features, ordered by how often people name them:
-
-## Co-top priority
-
-### The "tasteful default" (cream + serif + green), the 2026 tell
-
-The look the previous wave of anti-slop advice (including Claude's frontend-design skill) converged on, so it is now the clearest "AI tried to be tasteful" signal. A warm cream or beige page, a serif display face (Instrument Serif, Fraunces, Playfair), a sage or forest-green accent, often a generated product-screenshot card on the right. It reads as AI for the same reason the purple gradient did: nobody chose it. It lands harder than the gradient because it looks like taste.
-- Signatures: cream page background (`#faf8f5`, `#f5f1e8`, `bg-stone-50`, `bg-amber-50`); serif display (`Instrument Serif`, `Fraunces`, `Playfair Display`, `Cormorant`, `DM Serif`); sage/forest primary (emerald or green 700-900). Any two of the three together is the strong signal.
-- Fix: not a different nice palette. Anchor to the real brand or a reference; with none, pick a direction that is specific and uncommon. A genuine warm-editorial brand marks it `unslop-ignore`.
-
-### Default shadcn / Tailwind look
-
-The single most-named concrete cause of "they all look the same." The stock slate/zinc/gray cards, the default ring and border, the uniform `p-6` rhythm, the stock `rounded-lg`. shadcn is not the problem; shipping it untouched is.
-- Signatures: heavy repeated `bg-slate-*`/`bg-zinc-*`/`bg-gray-*` cards with `border rounded-lg shadow-sm`; `components.json` with `baseColor: "slate"`/`"zinc"` and untouched `cssVars`; `--radius: 0.5rem` left at default; the stock `rounded-lg border bg-card text-card-foreground shadow-sm` Card repeated with no theming.
-- Fix: theme the tokens before building. A real `--primary`, a chosen `--radius`, your own neutral ramp and spacing. Test: could someone tell your Card from the shadcn docs Card in a screenshot?
+Source names: [Reddit study](https://github.com/JCarterJohnson/vibecoded-design-tells), [Anthropic frontend-design](https://raw.githubusercontent.com/anthropics/skills/main/skills/frontend-design/SKILL.md), [shadcn Card](https://raw.githubusercontent.com/shadcn-ui/ui/main/apps/v4/registry/new-york-v4/ui/card.tsx), [Impeccable](https://impeccable.style/slop/), [signs-of-ai-design](https://github.com/febbhav/signs-of-ai-design), [stop-design-slop](https://github.com/Juuzoe/stop-design-slop), and [NN/g sparkles](https://www.nngroup.com/articles/ai-sparkles-icon-problem/). Source guidance supports review candidates; the scanner thresholds are house choices, not validated authorship tests.
 
 ## High
 
-### AI purple (violet / indigo primary)
+### The tasteful default (`claude-default-look`)
 
-The top colour tell, and it co-occurs with gradients more than any other pair. Models reach for Tailwind's indigo/violet when no brand colour is given, so purple-as-primary reads as "nobody chose this."
-- Signatures: `indigo-*`/`violet-*`/`purple-*`/`fuchsia-*` as the primary, CTA, or link (not an accent dot); primaries like `#6366f1`, `#7c3aed`, `#8b5cf6`, `#a855f7`; `--primary`/`--brand` at hue around 255 to 280.
-- Fix: a brand colour outside that band. If purple is the real brand, pick a specific off-default purple and pair it with a non-default neutral.
+Warm cream, a serif display face, and a sage/forest or terracotta/clay accent can become another interchangeable default. Anthropic now warns against the cream/serif/clay cluster itself. (source: Anthropic frontend-design, 2026-10)
 
-### Gradients, gradient text
+- Scanner: any two of three signal groups in one file produce one HIGH finding. A single group produces no finding. Cream backgrounds include `#faf8f5`, `#f5f1e8`, `#f4f1ea` and related listed swatches in the scanner, or `bg-stone-50/100`, `bg-amber-50/100`, `bg-orange-50/100`. Hex cream counts on `background`, `background-color`, or `--background` declarations. Serif names are Instrument Serif, Fraunces, Playfair Display, Cormorant, Spectral, and DM Serif. The accent group includes green/emerald 700-900 colour utilities, sage/forest swatches `#9caf88`, `#87a878`, `#2d4a3e`, `#264e36`, and clay swatches `#d97757`, `#c96442`, `#cc785c`. Green and clay together still count as one group; hex matching uses listed swatches, not a continuous colour range.
+- The accent must appear on a button, link or heading, a class/selector naming primary, accent, brand, CTA, button, link or heading roles, or a `--primary`, `--accent` or `--brand` theme variable (including suffixed names). Green pills combining `bg-green-100` with `text-green-700` (or emerald equivalents), and `span` elements with `rounded-full text-xs`, do not supply an accent signal. Status and warning lines do not contribute. Block, HTML and code line comments are masked across lines without treating quoted comment delimiters as comments; `unslop-ignore` lines do not contribute to any rule. Signals never combine across files. These are source co-occurrences, not computed styles or proof that a serif is used for display.
+- Fix: anchor the choices to a real brand or reference. Keep a deliberate warm-editorial identity and mark its source lines `unslop-ignore`.
 
-The purple-to-blue (or purple-to-pink) hero gradient, gradient-filled headings, gradient buttons. Gradient body text especially reads as generated, since almost no real brand does it on running copy.
-- Signatures: `bg-clip-text text-transparent` (or CSS `-webkit-background-clip: text`); `from-purple-* to-blue-*`, `from-violet-* to-indigo-*`; `bg-gradient-to-*` repeated across hero, buttons, cards.
-- Fix: solid fills by default. At most one restrained accent gradient, analogous and low-contrast. Never on running headings or paragraphs.
+### Untouched shadcn / Tailwind (`shadcn-default-card`)
+
+Shipping the stock Card and theme makes unrelated products resemble the same starter. The tools themselves are fine. (source: Reddit study, 2026-10)
+
+- Card signature: at least four of five class groups in one quoted string or CSS `@apply` directive, in any order: `rounded-lg` or `rounded-xl`, `border`, `bg-card`, `text-card-foreground`, `shadow-sm`. Extra layout classes and nested quote characters in arbitrary utilities are allowed. The current registry uses `rounded-xl`. (source: shadcn Card, 2026-10)
+- Theme signatures: `--radius: 0.5rem`, or a file literally named `components.json` with `baseColor` set to slate, zinc, neutral, gray, or stone and `cssVariables: true` (also accepts `cssVars: true`). Configuration fields can be under `tailwind` or at the root. Other JSON files are not included in directory scans.
+- Fix: choose primary, radius, neutrals, and spacing for the project. The signature is a review gate, not proof that tokens are unthemed.
+
+### AI purple (`ai-purple`)
+
+Indigo/violet/purple used as the fallback primary is a recurring complaint. (source: Reddit study, 2026-10)
+
+- Scanner: Tailwind indigo/violet/purple/fuchsia colour utilities at 400-800 and the listed common hex values. It cannot determine the actual primary role; platform/brand/social swatch lines are suppressed.
+- Fix: use the real brand colour. A deliberate purple identity gets `unslop-ignore`, not a replacement default.
+
+### Gradient text and purple-blue gradients (`gradient-text`, `purple-blue-gradient`)
+
+Gradient headings and purple-to-blue/pink hero fills recur across generated landing pages. (source: Reddit study, 2026-10)
+
+- Scanner: `bg-clip-text` with `text-transparent`, CSS text background clipping, purple-family `from-*` stops followed by blue/indigo/pink/cyan/sky `to-*`, or a linear gradient containing one of the listed purple hexes. It does not detect every gradient.
+- Fix: use solid text and fills unless the brief gives the gradient a role.
 
 ## Medium
 
-- **Too many animations.** Fade-in on every section, scale-up on every card hover, scrolljacking. A minor and noisier signal (the keyword catches tool mentions and praise too). Signatures: repeated `initial={{ opacity: 0 }}`/`whileInView`/`whileHover={{ scale }}`, `data-aos="fade-up"` everywhere, `hover:scale-1xx` on every card. Fix: motion only when it communicates state; honour `prefers-reduced-motion`; if every section animates the same way, cut it.
-- **Rounded corners and pill buttons on everything.** One large radius on cards, inputs, buttons, images, plus fully-pill buttons. Signatures: broad `rounded-2xl`/`rounded-3xl`/`rounded-full`, `border-radius: 9999px` on every button. Fix: a small radius scale applied by role. (The scanner skips `rounded-full` on small `h-`/`w-` boxes, since those are dots and avatars.)
-- **Dark mode with unprompted neon glow.** Dark mode is fine; the glow added when nobody asked is the tell. Signatures: `shadow-[0_0_*]`, `drop-shadow-[0_0_*]`, a saturated low-blur `box-shadow`/`text-shadow`, neon `text-cyan-400`/`text-green-400` on `bg-black`. Fix: remove glow you did not design. Dark mode should rely on contrast and spacing.
-- **Emoji as icons or bullets.** Rocket, sparkle, lightning, lock characters used as feature-card icons or section bullets. It needs no asset pipeline, so the model reaches for it. Signatures: emoji in `<h1>`/`<h2>`/`<h3>`, in feature titles, or as list markers. Fix: a real SVG icon set (Lucide, Phosphor, Heroicons) or none. Emoji in genuine body copy is fine.
-- **Generic default fonts.** Inter, Geist, Roboto, or `system-ui` as the only face is "nobody chose the type." There are two defaults now: Inter/Geist (the "no choice" default) and Instrument Serif/Fraunces (the "tasteful choice" default, see the 2026 tell). Both are autopilot. Signatures: `font-family: Inter`/`Geist`/`Roboto`; `next/font/google` importing one with no real second face; `font-sans` left at default. Fix: a face with character, chosen for a reason, paired display over body.
-- **The centered hero + three feature cards + CTA skeleton.** The most common generated landing page. The structure is the tell, before any colour. Signature: a `text-center` hero with a big headline and two buttons, then `grid grid-cols-1 md:grid-cols-3` of icon-title-blurb cards. Fix: break the grid. Asymmetric hero, a real product screenshot, varied sections.
+- **Repeated eyebrow chrome (`eyebrow-chrome`).** Three or more labels in one file, each with `uppercase` (a class or inline `text-transform`) and `tracking-wide`, `tracking-wider`, `tracking-widest`, or `letter-spacing`, directly preceding an `h1`-`h6`. The scanner recognizes `p`, `span`, `div`, or `small` labels containing plain text; attributes can span lines. Static React `style={{letterSpacing:".1em"}}` and `textTransform:"uppercase"` are supported, as are inline JSX comments between label and heading. Dynamic style values, spread attributes, computed properties and intervening components are not resolved. Keep an eyebrow only when it adds information. (source: Anthropic frontend-design, 2026-10)
+- **Tinted icon tiles (`tinted-icon-tiles`).** Three or more rounded `div`/`span` wrappers with `bg-primary/10` or `bg-*-500/10`, directly containing an icon component imported by name from a Lucide package. Repeating the tile can substitute decoration for product-specific imagery. Static class strings and `className={cn("...", "...")}` or `clsx` calls with only string literal arguments are supported. Conditional arguments, objects, variables, spreads, interpolated templates, nested icon wrappers and default/deep imports are not resolved. The scanner recognizes direct, self-closing icon components, including named import aliases, not arbitrary component trees. (source: stop-design-slop/references/imagery-icons.md, 2026-10)
+- **Too many animations (`fade-in-animations`).** Fade-in on every section and scale-up on every card can compete with the task. The scanner flags `initial={{ opacity: 0 }}`, `whileInView`, `whileHover={{ scale }}`, `data-aos`, and `hover:scale-1xx` individually; it does not measure motion density. Keep motion that explains a change and honour `prefers-reduced-motion`. (source: Reddit study, 2026-10)
+- **Rounded everything (`rounded-everything`).** The scanner flags `rounded-2xl`, `rounded-3xl`, `rounded-full`, and huge pill radii. Small `h-`/`w-` boxes are suppressed so dots and avatars pass. Choose a radius scale by role. (source: Reddit study, 2026-10)
+- **Unprompted neon glow (`neon-glow`).** Zero-offset saturated shadows are candidates; achromatic and inset shadows are suppressed. Dark mode itself is fine. Remove glow without a purpose. (source: Reddit study, 2026-10)
+- **Emoji icons (`emoji-as-icons`).** Rocket, sparkle, lightning, lock and related emoji used as feature icons can read as placeholders. The scanner flags its listed characters anywhere in source, so review body-copy uses before changing them. Use a meaningful SVG icon or none. (source: Reddit study, 2026-10)
+- **Default fonts (`generic-font`).** The scanner catches Inter, Geist, and Roboto declarations or font-loader calls, not whether the choice was deliberate. Choose one family or two for a reason; if two, make them distinct. A chosen font gets `unslop-ignore`. (source: Reddit study, 2026-10)
+- **Hero and three-card skeleton (`hero-three-cards`).** The scanner catches `grid-cols-1` followed by optional `sm:grid-cols-2` and `md:grid-cols-3`; it cannot establish the hero structure. Review whether content actually benefits from three equal cards. Structure the page around its task. (source: Reddit study, 2026-10)
 
-## Layout-quality tells (no scanner sees these)
+## Low
 
-Not colour or font, but a large part of why a page reads as AI. Check by eye on every build.
-- Text overflow and clipping: a heading or label running past or behind its container, a fixed-width card that does not handle long content. Give text room, let it wrap, test with real strings.
-- Inconsistent spacing: a page mixing `p-3` here, `p-7` there, an arbitrary `mt-[37px]`, with no spacing scale. The eye reads that as machine-made.
-- Misalignment: edges that almost line up, inconsistent gutters. Align to a grid.
-- No hierarchy: every section the same weight. Decide what the reader sees first and make the layout say so.
+- **Middle-dot metadata (`middle-dot-meta`).** Two or more distinct markup text runs containing `word · word · word` in one file produce one LOW finding. Multiple triplets within one run count once. JavaScript strings, JSX escaped examples, attributes, and script/style bodies do not count. Archive rows shaped like `2026 · October · Archive` are excluded. The rule matches literal middle dots, not `&middot;`, and does not evaluate dynamic expressions. Keep separators when they help read real metadata. (source: Anthropic frontend-design, 2026-10)
+- **Appended arrows (`appended-arrow`).** Three or more link/button labels ending in `→` produce one LOW finding per file. The scanner recognizes `a`, `button` and `Link`, decodes `&rarr;` and numeric entities, accepts static JSX `{"→"}` or `{'→'}`, and flattens child markup such as accessibility spans. Prefix arrows, arrows in the middle of labels, attributes and arbitrary source strings do not count. Dynamic text expressions, custom action components, CSS pseudo-elements, icon components and runtime translations are not resolved. CSS visibility and accessibility naming can change which source text readers encounter. Keep arrows that clarify navigation. (source: Anthropic frontend-design, 2026-10)
+- **Hype copy (`hype-copy`).** `Transform your`, `Supercharge`, `Unleash`, `Effortlessly`, `reimagined`, and similar canned claims. Say what the product does. (source: Reddit study, 2026-10)
+- **Stock illustrations (`stock-illustration`).** The scanner catches undraw, storyset, and drawkit source names. Check whether the image explains this product; prefer real screenshots where useful. (source: Reddit study, 2026-10)
 
-Fixing colour and font on an incoherent layout still leaves a site that reads as AI. The scanner gives a clean surface; these give a coherent structure.
+Repetition rules produce one finding per file at the first occurrence. Their source patterns do not establish rendered DOM relationships. Keep intentional choices with `unslop-ignore` on the contributing lines.
 
-## Lower-signal and copy tells
+## Human audit checks
 
-Real but minor; fix if cheap.
-- Centred everything and endless whitespace; stock undraw-style illustrations (use real screenshots).
-- Hero-copy cliches: `Transform your X`, `Supercharge`, `Unleash`, `Effortlessly`, `Your X, reimagined`. Write specific copy about what the thing does. (The text skill flags these too.)
+- **Decorative numbering.** `01 / 02 / 03` section labels belong on real sequences, such as steps or timelines. Remove numbers from unrelated sections. (source: Anthropic frontend-design, 2026-10)
+- **Dark acid-accent default.** Near-black `#0B0B0B`, `#111`, or `#111111` with one acid-green or vermilion accent can become another fallback. Check the brief and the whole palette; no scanner rule. (source: Anthropic frontend-design, 2026-10)
+- **Hairline broadsheet.** Dense newspaper columns, hairline rules, and zero radius need a content reason. Do not substitute this look for every rounded-card design; no scanner rule. (source: Anthropic frontend-design, 2026-10)
+- **Fabricated trust.** Verify logo clouds, testimonials, ratings, compliance badges, and rows claiming `10x`, `99.9%`, or `10,000+ users` against supplied sources, quote originals, relationships, and metric definitions. If unsupported, remove them or ask for evidence. Missing provenance is a verification gap, not proof of fabrication. No stat-row regex. (source: stop-design-slop, 2026-10)
+- **Sparkles / Wand2 on non-AI actions.** Check whether the icon explains the action. NN/g discusses ambiguous sparkles as an AI signifier, not an AI-authorship detector. No scanner rule for action meaning. (source: NN/g sparkles, 2026-10)
+- **Overflow and clipping.** Test headings and labels with real strings at narrow widths. Give text room and let it wrap. (house preference)
+- **Spacing, alignment, hierarchy.** Use a consistent spacing scale and gutters; make the primary task visually clear. A clean scan cannot establish layout coherence. (house preference)
+- **Centred everything and endless whitespace.** Review density and alignment against the content rather than applying either everywhere. (source: Reddit study, 2026-10)
 
-## Do not chase (cleared by the research)
+## Do not chase without context
 
-- Mesh/blob/aurora backgrounds: rejected as a keyword artifact (most matches were github `/blob/` URLs). Not a real complaint.
-- Bento grids: dead last, and people defend them. Not a tell.
-- Dark mode itself: only the unprompted glow is flagged.
-- shadcn/Tailwind themselves: the defaults are the tell, not the tools. A themed shadcn site is invisible to this complaint.
-
-Flag what the ranking supports, at the weight it supports.
+- **Mesh/blob/aurora backgrounds.** Advisory when repeated reflexively or unrelated to content. The original Reddit keyword analysis rejected an artifact involving `/blob/` URLs; it cannot prove absence as a tell. Current catalogs list these backgrounds. No scanner rule. (source: signs-of-ai-design, 2026-10)
+- **Bento grids.** Advisory when every section becomes a bento regardless of its content. The original Reddit study cannot prove absence as a tell; current catalogs list the pattern. No scanner rule. (source: signs-of-ai-design, 2026-10)
+- **Glassmorphism.** Advisory when glass panels recur without a layering need. Review purpose and readability; no scanner rule. (source: Impeccable, 2026-10)
+- **Dark mode and shadcn/Tailwind.** Tools and modes do not establish authorship. Review defaults and fit to the brief. (house preference)

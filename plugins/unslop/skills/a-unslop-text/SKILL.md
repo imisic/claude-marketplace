@@ -9,7 +9,7 @@ This skill checks writing for the patterns that make it read as machine-written 
 
 **This skill does not write well for you, and it does not impose a single house voice.** It does two narrow things. It removes the specific cues that make text read as machine-written, and where the text reads as AI because nobody chose a voice, it forces a deliberate, register-appropriate one. The argument and what you actually want to say are still yours. A guardrail is not a writer.
 
-Most of the work is the first thing, and most of the first thing is mechanical. The em dash becomes a comma or a period. `delve into` becomes `look at`. The sycophantic opener gets cut. The `as an AI` boilerplate gets deleted. Those are not style calls; there is no voice to invent. Lead with the plain fix. Reserve the deliberate-voice work for the stylistic choices.
+Most of the work is the first thing, and most of the first thing is mechanical. The configured dash rule calls for a comma or a period where it fits. Figurative `delve into` can become `look at`. The sycophantic opener gets cut. The `as an AI` boilerplate gets deleted. Those are not style calls; there is no voice to invent. Lead with the plain fix. Reserve the deliberate-voice work for the stylistic choices.
 
 ## How this fits alongside a house style guide
 
@@ -21,7 +21,7 @@ Per-project overlays sit on top of this layer, not under it: a project's own ter
 
 ## The trap to avoid
 
-The failure mode of every anti-AI-writing effort is swapping one default register for another. The smooth corporate voice (the em dash, `delve`, a bulleted list for everything, a tidy "in conclusion") was the 2024 default. The 2026 over-correction is its mirror: staccato three-word fragments, forced lowercase, a `here's the thing` cold open, a swear bolted on, fake typos to beat a detector. Readers clock the second just as fast. Treat the over-corrected register as its own tell. The fix for a dash is a comma in a sentence you would actually write, not an ellipsis and not a contortion around the gap. See `references/writing-with-intent.md`.
+The failure mode of every anti-AI-writing effort is swapping one default register for another. The smooth corporate voice (the em dash, `delve`, a bulleted list for everything, a tidy "in conclusion") was the 2024 default. The 2026 over-correction is its mirror: staccato three-word fragments, forced lowercase, a `here's the thing` cold open, a swear bolted on, fake typos to beat a detector. Wikipedia dates dash overuse to 2022 through September 2026 and reports newer models tuned to avoid dashes, with plain words and short 8-20 word sentences. Dash-free short plain prose is no longer evidence of a human. Review uniform short sentences and punctuation impoverishment instead, with reader context in mind. The dash ban is a house preference, not an authorship signal. (source: Wikipedia:Signs of AI writing, 2026-10) The fix for a dash is a comma in a sentence you would actually write, not an ellipsis and not a contortion around the gap. See `references/writing-with-intent.md`.
 
 ## Not an AI detector
 
@@ -45,15 +45,17 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" <path> --severity high
 python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" <path> --json          # for CI
 ```
 
-It scans `.md .markdown .mdx .txt .rst .html`, reports each finding with file, line, the matched text, and the fix, plus a configured-style score and a density per 1,000 authored words (quoted lines are excluded from the denominator, so a piece that is mostly quotation is not diluted). Exit code is `1` when any high-severity violation exists, `0` when none exists, and `2` for invalid input, so CI can gate on it.
+It scans `.md .markdown .mdx .txt .rst .html`, skips any `fixtures` directory beneath a `test` or `tests` directory during traversal (explicit file paths still scan), reports each finding with file, line, matched text, and fix, plus a configured-style score and density per 1,000 authored words. Exit code is `1` when any high-severity violation exists, `0` when none exists, and `2` for invalid input.
 
-Some rules are frequency-sensitive and stay silent until a word appears twice in the same file, because one register-appropriate `robust` is not a signal and four of them are. `references/tells.md` marks which rules work that way.
+HTML tags and attributes, script/style bodies, and comments are excluded from authored prose. Markdown emphasis, heading prefixes, and list markers are removed for phrase matching. Paragraph whitespace is normalized for phrase matching, with findings mapped to source lines. HTML block tags separate paragraphs; inline tags preserve surrounding text.
 
 Be honest about what the scanner is: a lexical style filter. It catches the em dash, the high-signal diction, the antithesis cadence, the formatting tics. It cannot judge authorship, factual value, originality, uniform rhythm, or whether a paragraph earns its space. A clean scan means the configured lexical layer is clean, not that the writing reads as a person. After every scan, run the structural and concision pass in `references/tells.md`.
 
 For the concision pass, test every paragraph and sentence: keep it only if it adds a claim, evidence, a decision, an exception, necessary context, or a reader action. Cut it when removing it changes nothing. Do not shorten away a requirement, a factual caveat, or a source.
 
-**Escape hatch.** A line containing `unslop-ignore` or `voice-allow` is skipped, for a tell used on purpose (a verbatim citation, a section name, a deliberate register). Use it sparingly; if you reach for it more than once or twice per pass, the rule probably needs adjusting.
+After a rewrite, compare it with the original: numbers, names, dates, URLs, citations, negations (`not`, `never`, `no`), and modals (`must`, `should`, `may`) must survive unchanged, and nothing may be invented. See the meaning check in `references/tells.md`. `python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_text_scan.py" --compare ORIGINAL REWRITE` checks token inventories for numbers, URLs, negations, and modals (advisory, exit 0); verify meaning and attribution by hand, then rescan the rewrite.
+
+**Escape hatch.** A line containing `unslop-ignore` or `voice-allow` is skipped, for a tell used on purpose (a verbatim citation, a section name, a deliberate register). `voice-allow` accepts comments such as `<!-- voice-allow: reason -->`. Use it sparingly; if you reach for it more than once or twice per pass, the rule probably needs adjusting.
 
 **Fixing well.** Do not fix `delve into` by swapping in `dive into`, which is another tell. Use the plain verb you would actually say. A fix that introduces the over-corrected register (choppy fragments, fake typos) is not a fix.
 

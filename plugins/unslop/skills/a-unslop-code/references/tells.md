@@ -1,46 +1,60 @@
 # AI-code tells: the catalog
 
-The human-readable view. The scanner (`scripts/unslop_code_scan.py`) is the enforced layer for the surface tells; this file explains them and lists the ones a regex cannot see. The ranking and the shares come from the research credited in `SKILL.md`; the structure and prose here are this skill's.
+The scanner (`scripts/unslop_code_scan.py`) finds surface patterns and test-integrity risks. These are review candidates, not proof of authorship or measured scanner precision. The original catalog comes from the Reddit research credited in `SKILL.md`; later checks have separate sources below. Dates on provenance tags identify the source edition or review month.
 
-Sort by class first, not by whether a regex can see it. A bug means the code is wrong. A substance problem means it is wrong for the job. A cosmetic just looks machine-made. Fix bugs and substance because the code is broken or wrong-for-the-job. Strip cosmetics because they read as AI. A clean cosmetic pass is not a substitute for the other two.
+Sort by class first. Bug findings point to possible broken behavior; substance findings need the requirement and repo context; cosmetic findings are advisory. Only bug-class HIGHs should gate review. The CLI preserves its existing exit code, the count of all HIGH findings, so gates must filter JSON findings by class and severity. A clean scan still needs execution and human review.
 
-## The loud ones (no regex sees these)
+## Human review (no scanner rule)
 
-The research is blunt: the tells people name most are about shape, and a scanner is blind to all of them. These need a compiler or your eyes.
+- **Fallback masking.** Substance. `or {}`, `?? []`, `?? {}`, and `getattr(..., None)` can turn a broken contract into plausible empty data. A regex cannot distinguish that from a valid default, including idiomatic PHP view defaults. Check whether absence is a valid state; if not, fail loudly. (source: code-humanizer, 2026-10)
+- **Tutorial-shaped boilerplate.** Substance. Sample data, dummy integrations, or a demo-shaped implementation where the requirement needs the real service. Build against the real requirement; the scanner's dummy-data markers are only a weak proxy. (source: vibecoded-design-tells, 2026-10)
+- **Made-up APIs and libraries.** Bug. A plausible import or call does not establish that the dependency or API exists. Build, type-check, run, and check the actual documentation. (source: vibecoded-design-tells, 2026-10)
+- **Over-engineering.** Substance. Layers and abstractions without a requirement. Compare the change to a direct implementation and the surrounding code before deleting them. (source: vibecoded-design-tells, 2026-10)
+- **Ignoring the surrounding repo.** Substance. A new logging style, error pattern, or structure that duplicates or conflicts with local conventions. Read the nearest sibling and match it. (source: vibecoded-design-tells, 2026-10)
+- **Mixed skill level.** Substance. Advanced patterns beside basic mistakes warrant a closer read. Require an explanation and evidence that the code works. (source: vibecoded-design-tells, 2026-10)
+- **Too clean, no human mess.** A weak, contested complaint, not a reason to add quirks. A clean surface does not end a correctness review. (source: vibecoded-design-tells, 2026-10)
+- **Defensive probing on trusted internal paths.** Substance. Review `isinstance`/`hasattr` ladders, repeated null checks after validation, and try/except around internal invariants. If the contract already guarantees the value, remove checks that hide a broken invariant. Validation at trust boundaries remains exempt. (source: Cursor deslop, 2026-10)
+- **Duplicating an existing helper.** Substance. A broad complaint about reinventing the wheel is not enough, but concrete duplication of an existing helper is a review finding. Search the repo and reuse the helper when its contract fits. (source: Cursor deslop; code-humanizer, 2026-10)
+- **Tests asserting only their own mocks.** Bug review. Trace assertions to the real system under test. A test that supplies a mock value and only checks that same value may never exercise the implementation; mock count alone proves nothing. This needs human review. (source: slopguard, 2026-10)
+- **Hardcoded success and evaluator interference.** Bug review. Look for production branches special-casing test inputs, hardcoded expected outputs used instead of computing results, and evaluator monkeypatches. Ordinary expected values in tests are valid. These require human review beyond the diff patterns below. (source: EvilGenie, 2026-05; METR reward hacking, 2025-06)
 
-- **Tutorial-shaped boilerplate** (the top tell, ~19% verified). Substance. The model emits the average of public code: the sample app, dummy data, no real backend. Fix: build the real thing against the real requirement. The scanner's dummy-data markers (`lorem ipsum`, `YOUR_API_KEY`, `John Doe`) are a weak proxy only.
-- **Made-up APIs and libraries** (~11%). Bug, the one that bites in production. A plausible call to something that does not exist, or logic that reads right and runs wrong. Only building, type-checking, running, or resolving the import catches it. Run it.
-- **Over-engineering** (~8%). Substance. Layers and abstractions for a simple task. Every extra layer is more surface for a bug. Ask whether an `if`/`else` would do; delete the abstraction with one caller.
-- **Ignoring the surrounding repo** (~4%). Substance, and the spine of the fix. Code that works in isolation and invents a new logging style, a new error pattern, a new structure mid-file. The 2000-line change that should have been 50. Fix: feed the model the existing code and match it.
-- **Mixed skill level** (~2%). Substance. Advanced patterns next to beginner mistakes, and no one can explain it because no single person wrote it. If you cannot explain a line, do not ship it.
-- **Too clean, no human mess** (weak, contested). A meta-signal: passes the linter, no quirks, logic still wrong. For the reviewer only: a clean surface does not end the review.
+## Surface rules
 
-## The surface ones (the scanner catches these)
+Each entry names the scanner rule, its severity, and its class. `unslop-ignore` skips its line.
 
-Each tagged bug or cosmetic.
+- **Swallowed errors** (`swallowed-errors`, MEDIUM bug). Python bare, `Exception`, and `BaseException` handlers (including singleton tuples and `builtins` qualification) are checked with indentation-based lookahead. Only empty, `pass`, `...`, or print/log-only bodies are flagged. Re-raises, raises, returns, and real handling are left for review. Inline empty or comment-open catches in JS/TS, Java, and C#, Ruby `rescue => name` headers, and Go's single-line empty or comment-open error blocks retain their surface checks. Rust `.unwrap()`/`let _ =` and multi-line empty catches or Go blocks need a human. (source: vibecoded-design-tells; Ruff BLE001, 2026-10)
+- **Placeholder stubs** (`placeholder-comment`, HIGH bug). `// rest of your code`, `# your logic here`, `// implementation goes here`, or `# TODO: implement` can mark unfinished code. Write the implementation or explain an intentional example with `unslop-ignore`. (source: vibecoded-design-tells, 2026-10)
+- **Emoji in source** (`emoji-in-code`, MEDIUM cosmetic). Emoji in comments, strings, or logs. Remove them unless deliberately chosen, such as a CLI checkmark marked `unslop-ignore`. Emoji logs are counted here rather than also as boilerplate markers. (house preference)
+- **Narrating comments** (`narrating-comment`, MEDIUM cosmetic). Full-line `//`, `#`, and `--` comments that restate the immediately following line nearly verbatim (`# increment i` above `i += 1`), or explicitly narrate steps (`Step 1`, `Now we`, `First, we`, `Next, we`, `Finally, we`). Docblock lines are exempt. Single-verb section labels above a block are allowed. (source: vibecoded-design-tells, 2026-10)
+- **Generic placeholder names** (`generic-naming`, MEDIUM cosmetic). `process_data`, `handle_data`, `do_stuff`, and related placeholders. Name the function for its actual job; check whether it does too much. (source: vibecoded-design-tells, 2026-10)
+- **Pasted chat artifacts** (`chat-artifact`, HIGH cosmetic). Code fences, `Here's the updated code`, `As an AI`, or `Good catch!`. Assistant residue includes first-person change reports such as `I have updated` or `I've added`, `as requested`, `here is the updated code`, `let me know`, `hope this helps`, and reader instructions such as `replace the token before running` or `don't forget to`. An invariant such as `# Note: writes must remain atomic` is allowed. (source: vibecoded-design-tells, 2026-10)
+- **Whole-sentence identifiers** (`verbose-naming`, LOW cosmetic). Definitions with at least six word segments, such as `getUserDataFromApiResponseHandler`. `WebSite` and `JsonLd` each count as one compound segment. Calls and HTML IDs are excluded. Trim only when the precise job survives; test names and uppercase constants are exempt. (source: vibecoded-design-tells, 2026-10)
+- **Dummy-data markers** (`boilerplate-marker`, LOW cosmetic). Placeholder API keys, `lorem ipsum`, sample identities, `example.com`, and `Here we go` logs. `example.com` in comments, HTML form placeholders, or visible HTML text is exempt. Inspect their purpose before replacing them. Plain `Successfully...` and `Done!` logging is not flagged. (source: vibecoded-design-tells, 2026-10)
+- **Checker suppression** (`checker-suppression`, MEDIUM bug, advisory). `# type: ignore`, `# noqa`, `@ts-ignore`, `@ts-expect-error`, `eslint-disable`, `as any`, `as unknown as`, and `: any` annotations without a same-line reason. Directives must be in real comments; casts and annotations must be outside strings, comments, and visible markup text. Fix the underlying error or add a reason. Codes and target types alone are not reasons; `# noqa: E501  reason` and `// @ts-expect-error: upstream types wrong` are exempt. Casts need a comment explaining the reason. (source: Cursor deslop, 2026-10)
+- **Change narration** (`change-narration`, MEDIUM cosmetic). Comments beginning `Updated/Changed/Modified/Fixed/Refactored to/from/so/the`, or `Now uses`, `Previously this/was`, `was changed to`, `Old:`, `New:`. Strings and continuing requirements such as `Previously computed values must remain available` are exempt. Remove edit history or explain the continuing reason for the code. (source: code-humanizer, 2026-10)
+- **Repo debris** (`repo-debris`, MEDIUM cosmetic). Files named `IMPLEMENTATION_SUMMARY.md`, `*_SUMMARY.md`, `COMPLETED.md`, `CHANGES_MADE.md`, or `FIX_NOTES.md` at any scanned depth. Check filenames only, not Markdown contents; retain files with a continuing documentation purpose. A first-line `unslop-ignore` exempts the filename finding. Existing skipped directories stay skipped; `tests/` stays in normal scan scope, but `fixtures` directories are excluded from project traversal; a direct path still scans them. (house preference)
 
-- **Swallowed errors** (bug). A bare `except:`, `except Exception: pass`, an empty `catch {}`, an empty Go `if err != nil {}`. Eats the failure you needed. Fix: catch the specific case, handle it, let the unexpected surface. Rust `.unwrap()`/`let _ =` and Go's multi-line empty block are a human pass (too overloaded to regex without noise).
-- **Placeholder stubs** (bug). `// rest of your code`, `# your logic here`, `// implementation goes here`, `# TODO: implement`. The file is unfinished. Fix: write the real code.
-- **Emoji in source** (cosmetic, the highest-precision cosmetic tell). Any emoji in a comment, string, or log. Fix: remove it. A real CLI checkmark chosen on purpose gets `unslop-ignore`.
-- **Narrating comments** (cosmetic). A comment that restates the next line (`# increment i`) or steps through (`# Step 1`, `# Now we...`). Fix: comment why, not what.
-- **Generic placeholder names** (cosmetic, often hiding a substance problem). `process_data`, `handle_data`, `do_stuff`, `do_something`. A `process_data` that does eleven things is the canonical case. Fix: name it for its job; if you cannot, it does too much.
-- **Pasted chat artifacts** (cosmetic). A code fence inside a source file, `Here's the updated code`, `As an AI`, `Good catch!`, a trailing `Note:`/`Remember:` preamble. Fix: delete the assistant's voice.
-- **Whole-sentence identifiers** (cosmetic, weak). `getUserDataFromApiResponseHandler`. The model pads names to self-document. Fix: trim to the precise noun or verb. Descriptive is good; a paragraph is not.
+## Test-integrity diff rules
 
-## Language coverage
+Run `git diff | python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_code_scan.py" --diff` or `python3 "${CLAUDE_SKILL_DIR}/scripts/unslop_code_scan.py" --diff-base REF`. The latter runs `git diff REF` in the supplied path (or the current repo). These modes run only the test-integrity rules, not the normal surface scan. They preserve the JSON fields and count only test files with hunk lines in `files_scanned`.
 
-A tell in a comment or string looks the same in every language, so emoji, stubs, narrating comments, and chat artifacts are caught anywhere. Syntax-keyed tells are uneven by design, because forcing a regex past what it does reliably costs precision:
-- Swallowed errors: matched for Python, JS/TS, Java, C#, Ruby try/catch and Go's single-line empty error block. Rust `.unwrap()`/`let _ =` and Go's `_`-discard are a hand read.
-- Generic names: keyed on `def`/`function`/`func`/`fn`/`fun`/`sub`.
-- An over-broad-but-handled `catch (Exception)` that logs and moves on is not flagged; it can be a real boundary.
+Test paths match `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`, or files under `tests/` and `__tests__/`. Findings use the old line number for deletions and the new line number for additions. Only executable assertions, skip calls, and decorators count. Quoted data, comments, context lines, production files, and lines carrying `unslop-ignore` are ignored. Treat flags as requests to inspect the requirement and any replacement checks, not proof of cheating.
 
-If your language is outside that set, read for swallowed errors and generic names by hand.
+- **Removed assertions** (`test-assertion-removed`, HIGH bug). Removed `assert`, assertion calls, or `expect(...)` lines. Confirm a replacement check or a requirement change; moving an assertion can still flag. (source: EvilGenie, 2026-05; METR reward hacking, 2025-06)
+- **Added skips** (`test-skip-added`, HIGH bug). Added pytest skip/skipif/xfail calls or decorators, unittest skip decorators, it/test/describe `.skip`, `xit`/`xdescribe`, `@Disabled`, Go `t.Skip`/`t.Skipf`/`t.SkipNow`, or PHPUnit `markTestSkipped`/`markTestIncomplete`. Require a reason tied to the requirement before weakening coverage. (source: EvilGenie, 2026-05; METR reward hacking, 2025-06)
+- **Added tautologies** (`test-tautology-added`, HIGH bug). Added `assert True` or `expect(true).toBe(true)`, including whitespace and parentheses variants and an expectation continued on the next added line. Check an observable result from the implementation instead. (source: EvilGenie, 2026-05; METR reward hacking, 2025-06)
 
-## Do not chase (cleared by the research)
+## Do not chase without context
 
-Three popular complaints did not survive verification. The scanner leaves them alone:
-- Left-in debug logging (`print`/`console.log`, chatty `Successfully...` lines): the tagged cases were workflow opinions, not code. Bare logging is not flagged.
-- Reinventing the wheel: mostly misread as duplication or made-up libraries.
-- Over-defensive validation: half the complaints were the opposite (no validation at all). Do not flag it in review. Do still avoid producing it (see the over-correction trap in `SKILL.md`).
+- **Bare debug or success logging.** The research did not establish ordinary `print`/`console.log` or `Successfully...` messages as reliable code defects. Deliberate logging is allowed; separately matched placeholders or emoji still receive their own findings. (source: vibecoded-design-tells, 2026-10)
+- **Validation at trust boundaries.** Validate untrusted input and external responses. Review defensive probing only where an internal contract already guarantees the value. (source: Cursor deslop, 2026-10)
 
-Flag what the research supports, at the weight it supports. Over-flagging trains people to ignore the tool.
+## Sources
+
+- [vibecoded-design-tells](https://github.com/JCarterJohnson/vibecoded-design-tells/tree/main/unslop-ai-code), original MIT catalog and scanner credit. Its discussion classifications do not establish scanner precision.
+- [EvilGenie, arXiv 2511.21654](https://arxiv.org/abs/2511.21654), revised May 2026, test editing and hardcoded test cases.
+- [METR reward hacking](https://metr.org/blog/2025-06-05-recent-reward-hacking/), June 2025, scoring and evaluator interference.
+- [Cursor deslop](https://github.com/cursor/plugins/blob/main/cursor-team-kit/skills/deslop/SKILL.md), trusted-path defensive checks and checker bypasses. <!-- ship-allow: public upstream source URL -->
+- [code-humanizer](https://github.com/LeonardNJU/code-humanizer/blob/main/SKILL.md), practitioner guidance for fallbacks, existing helpers, and change narration.
+- [slopguard](https://github.com/WT-MM/slopguard), mock-echo and mock-only review candidates.
+- [Ruff BLE001](https://docs.astral.sh/ruff/rules/blind-except/), handling and re-raise distinctions for broad Python exceptions.

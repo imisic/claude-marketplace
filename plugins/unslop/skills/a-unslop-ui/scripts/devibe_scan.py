@@ -4,10 +4,7 @@ devibe_scan.py - scan a web codebase for "vibe-coded" / AI-generated design tell
 
 Forked (MIT) from github.com/JCarterJohnson/vibecoded-design-tells.
 
-Plain Python, standard library only. Detection patterns and their severity come from a
-Reddit analysis (~3.2M posts / 3,033 on-topic comments across 47 subreddits) of what
-people actually flag as making a site look AI-generated. Severity follows how often each
-tell is named in that data, so the report tells you where to spend effort.
+Plain Python, standard library only. Adapted from the credited Reddit study, with current design guidance added. Severity reflects judged risk and pattern precision, not complaint frequency or a calibrated probability of AI authorship.
 
 Usage:
     python3 devibe_scan.py <path>                 # scan a dir or file
@@ -18,6 +15,7 @@ Usage:
 Exit code is the number of HIGH-severity findings (0 = none), so CI can gate on it.
 """
 import os, re, sys, json, argparse
+from html import unescape
 
 EXTS = {".html", ".htm", ".css", ".scss", ".sass", ".less", ".js", ".jsx",
         ".ts", ".tsx", ".vue", ".svelte", ".astro", ".mdx"}
@@ -26,24 +24,24 @@ SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".next", "out", "vendor",
              # Not shipped UI. Design comps, palette swatch pages and superseded
              # redesigns describe a look rather than serve it, so a tell inside one
              # is a quotation, not a defect. Scanning them buried the real findings.
-             "docs", "_archive", "archive", "mockups", "examples",
+             "docs", "_archive", "archive", "mockups", "examples", "_demo", "demo", "demos",
              ".storybook", "storybook-static", "__snapshots__", "fixtures"}
 
-# A design tell inside a comment is almost always someone writing *about* the tell
-# (a rule, a TODO, a palette note). The scanner is line-based, so approximate
-# "inside a comment" with "the line opens as one".
-COMMENT_LINE = re.compile(r"^\s*(\*/?|//|/\*|<!--)")
+# Keep source offsets when masking so every finding still points at its original line.
+LITERAL = re.compile(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`''', re.DOTALL)
+COMMENT = re.compile(r"/\*.*?(?:\*/|\Z)|<!--.*?(?:-->|\Z)|//[^\r\n]*", re.DOTALL)
+VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+ATTRS = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[^>"'`])*'''
 W = {"high": 3, "medium": 2, "low": 1}
 
-# Each rule: id, label, severity, fix, and patterns (compiled case-insensitive).
+# Each rule: id, label, severity, fix, and patterns (case-insensitive by default).
 # Keep patterns specific enough to avoid drowning the report in false positives.
 RULES = [
     # ---- HIGH: the top concrete tells ----
     {"id": "shadcn-default-card", "label": "Untouched shadcn default Card / theme", "sev": "high",
      "fix": "Theme the tokens (primary, radius, neutrals, spacing). Stock defaults are the giveaway, not shadcn.",
-     "pats": [r"rounded-lg\s+border\s+bg-card\s+text-card-foreground\s+shadow-sm",
-              r"\"baseColor\"\s*:\s*\"(slate|zinc|gray|neutral|stone)\"",
-              r"--radius\s*:\s*0\.5rem"]},
+     "pats": [r"--radius\s*:\s*0\.5rem"],
+     "card": True, "config": True},
     {"id": "ai-purple", "label": "AI purple / indigo / violet as primary color", "sev": "high",
      "fix": "Pick a brand color outside the violet/indigo/purple band. It is Tailwind's default, so it reads as 'nobody chose this'.",
      "pats": [r"\b(bg|text|from|via|to|border|ring|fill|stroke|decoration|outline)-(indigo|violet|purple|fuchsia)-(400|500|600|700|800)\b",
@@ -59,13 +57,12 @@ RULES = [
      "fix": "Default to solid fills. If you must gradient, keep stops analogous and low-contrast, never the rainbow purple-to-blue.",
      "pats": [r"from-(purple|violet|indigo|fuchsia)-\d+\s+(via-[a-z]+-\d+\s+)?to-(blue|indigo|pink|cyan|sky)-\d+",
               r"linear-gradient\([^)]*#(6366f1|7c3aed|8b5cf6|a855f7)[^)]*\)"]},
-    {"id": "claude-default-look", "label": "The 'tasteful default' look (cream background + serif display)", "sev": "high",
-     "fix": "This is the 2026 tell, not the fix. Anchor color and type to the real brand or a reference. If cream + serif is a genuine decision, mark the line unslop-ignore.",
-     "pats": [r"#(faf8f5|f5f1e8|f3eee3|fdfbf7|f7f3ec|faf6ef|f6f1e7|fbf7f0|f4efe4)\b",
-              r"\bbg-(stone|amber|orange)-(50|100)\b",
-              r"\b(Instrument\s*Serif|Fraunces|Playfair\s*Display|Cormorant|Spectral|DM\s*Serif)\b"],
-     # The tell is a warm page background. Amber on a warning badge is a status color
-     # that every palette has, and flagging it buried the real hits under UI chrome.
+    {"id": "claude-default-look", "label": "The 'tasteful default' cluster (cream / serif / green or clay)", "sev": "high",
+     "fix": "Anchor color and type to the real brand or a reference. Mark deliberate choices unslop-ignore on their source lines.",
+     "pats": [r"(?:background(?:-color)?|--background)\s*:\s*#(faf8f5|f5f1e8|f3eee3|fdfbf7|f7f3ec|faf6ef|f6f1e7|fbf7f0|f4efe4|f4f1ea)\b|\bbg-(stone|amber|orange)-(50|100)\b",
+              r"\b(Instrument\s*Serif|Fraunces|Playfair\s*Display|Cormorant|Spectral|DM\s*Serif)\b",
+              r"\b(?:bg|text|border|ring|fill|stroke)-(emerald|green)-(700|800|900)\b|#(d97757|c96442|cc785c|9caf88|87a878|2d4a3e|264e36)\b"],
+     "min_signals": 2,
      "suppress": r"\b(warning|caution|alert|notice|error|danger|success|info|badge|toast|status|pending|tag|chip|highlight|mark)\b"},
 
     # ---- MEDIUM ----
@@ -95,12 +92,29 @@ RULES = [
      "fix": "Use a real SVG icon set (Lucide/Phosphor/Heroicons) or none. Emoji-as-UI signals low effort.",
      "pats": [r"[\U0001F680✨⚡\U0001F525\U0001F4A1\U0001F512✅\U0001F3AF\U0001F31F\U0001F6E1\U0001F4C8\U0001F511\U0001F389\U0001F680]"]},
     {"id": "generic-font", "label": "Generic default font (Inter / Geist / Roboto / system)", "sev": "medium",
-     "fix": "Choose a typeface with character and pair a display + body face. The starter font reads as 'no choice made'.",
+     "fix": "Choose one family or two for a reason. If two, make them clearly distinct. The starter font reads as 'no choice made'.",
      "pats": [r"font-family\s*:\s*['\"]?(Inter|Geist|Roboto)\b",
               r"\b(Inter|Geist|Geist_Mono|Roboto)\s*\(",
               r"fontFamily\s*:\s*\{[^}]*['\"](Inter|Geist|Roboto)"]},
 
+    {"id": "eyebrow-chrome", "label": "Repeated tracked uppercase labels above headings", "sev": "medium",
+     "fix": "Keep labels only when they add information; remove repeated decorative eyebrows.",
+     "pats": [r"<(?P<eyebrow>p|span|div|small)\b(?P<attrs>" + ATTRS + r")>[^<]*</(?P=eyebrow)>\s*<h[1-6]\b"],
+     "min_count": 3},
+    {"id": "tinted-icon-tiles", "label": "Repeated rounded tinted icon tiles", "sev": "medium",
+     "fix": "Use icons where they explain a feature; avoid repeating the same decorative tile.",
+     "pats": [r"<(?P<tile>div|span)\b(?P<attrs>" + ATTRS + r")>\s*<(?P<icon>[A-Z][A-Za-z0-9]*)\b" + ATTRS + r"/\s*>\s*</(?P=tile)>"],
+     "case_sensitive": True, "min_count": 3},
+
     # ---- LOW: copy + minor ----
+    {"id": "middle-dot-meta", "label": "Repeated middle-dot metadata strings", "sev": "low",
+     "fix": "Use metadata separators when the content needs them, not as template decoration.",
+     "pats": [r"\b\w+ · \w+ · \w+\b"],
+     "markup_text": True, "min_count": 2},
+    {"id": "appended-arrow", "label": "Repeated arrows appended to links or buttons", "sev": "low",
+     "fix": "Keep arrows when they clarify navigation; remove automatic arrows on every action.",
+     "pats": [],
+     "min_count": 3},
     {"id": "hype-copy", "label": "Generated marketing copy cliche", "sev": "low",
      "fix": "Say what the product literally does, with specifics. Cut the template hype words.",
      "pats": [r"\bTransform your\b", r"\bSupercharge\b", r"\bUnleash\b", r"\bEffortlessly\b",
@@ -118,7 +132,7 @@ def compile_rules(min_sev):
         if order.index(r["sev"]) > floor:
             continue
         r = dict(r)
-        r["rx"] = [re.compile(p, re.IGNORECASE) for p in r["pats"]]
+        r["rx"] = [re.compile(p, 0 if r.get("case_sensitive") else re.IGNORECASE) for p in r["pats"]]
         r["suppress_rx"] = re.compile(r["suppress"], re.IGNORECASE) if r.get("suppress") else None
         out.append(r)
     return out
@@ -131,8 +145,238 @@ def iter_files(path):
         for f in files:
             if f.endswith(".min.js") or f.endswith(".min.css"):
                 continue
-            if os.path.splitext(f)[1].lower() in EXTS:
+            if os.path.splitext(f)[1].lower() in EXTS or f == "components.json":
                 yield os.path.join(root, f)
+
+def blank(text):
+    return re.sub(r"[^\r\n]", " ", text)
+
+def code_comments(text):
+    tokens = re.compile(LITERAL.pattern + "|" + COMMENT.pattern, re.DOTALL)
+    return tokens.sub(lambda m: blank(m.group()) if COMMENT.fullmatch(m.group()) else m.group(), text)
+
+def brace_end(text, start):
+    depth, i = 1, start + 1
+    while i < len(text):
+        token = LITERAL.match(text, i) or COMMENT.match(text, i)
+        if token:
+            i = token.end()
+            continue
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if not depth:
+                return i + 1
+        i += 1
+    return len(text)
+
+def tag_at(text, start):
+    opener = re.match(r"<(/?)([A-Za-z][\w:.-]*|)(?=[\s/>])", text[start:])
+    if not opener:
+        return None
+    i = start + opener.end()
+    attrs_start = i
+    while i < len(text):
+        token = LITERAL.match(text, i) or COMMENT.match(text, i)
+        if token:
+            i = token.end()
+            continue
+        if text[i] == "{":
+            i = brace_end(text, i)
+            continue
+        if text[i] == ">":
+            return (i + 1, opener.group(2), text[attrs_start:i], bool(opener.group(1)))
+        i += 1
+    return None
+
+def source_views(text, code):
+    """Mask comments everywhere and code literals outside markup in a second view."""
+    clean, markup = [], []
+    stack = []
+    i = 0
+    while i < len(text):
+        in_code = (code and not stack) or (stack and stack[-1].lower() in {"script", "style"})
+        comment = COMMENT.match(text, i)
+        if comment and (not comment.group().startswith("//") or in_code):
+            masked = blank(comment.group())
+            clean.append(masked)
+            markup.append(masked)
+            i = comment.end()
+            continue
+        literal = LITERAL.match(text, i) if in_code else None
+        if literal:
+            clean.append(literal.group())
+            markup.append("?" + blank(literal.group())[1:])
+            i = literal.end()
+            continue
+        tag = tag_at(text, i) if text[i] == "<" else None
+        if tag:
+            end, name, attrs, closing = tag
+            chunk = code_comments(text[i:end])
+            clean.append(chunk)
+            markup.append(chunk)
+            if closing:
+                if name in stack:
+                    del stack[stack.index(name):]
+            elif name not in VOID_TAGS and not attrs.rstrip().endswith("/"):
+                stack.append(name)
+            i = end
+            continue
+        if text[i] == "{" and re.match(r"\{\s*/\*", text[i:]):
+            end = brace_end(text, i)
+            chunk = code_comments(text[i:end])
+            if not chunk[1:-1].strip():
+                clean.append(blank(chunk))
+                markup.append(blank(chunk))
+                i = end
+                continue
+        if not in_code and text[i] == "{":
+            end = brace_end(text, i)
+            chunk = code_comments(text[i:end])
+            if not chunk[1:-1].strip():
+                chunk = blank(chunk)
+            clean.append(chunk)
+            # Only the cheap, static arrow expression is needed by the suffix rule.
+            static_arrow = re.fullmatch(r'''\{\s*(["'])→\1\s*\}''', chunk)
+            masked = blank(chunk)
+            if static_arrow:
+                offset = chunk.index("→")
+                masked = masked[:offset] + "→" + masked[offset + 1:]
+            elif chunk.strip():
+                masked = "?" + masked[1:]
+            markup.append(masked)
+            i = end
+            continue
+        clean.append(text[i])
+        markup.append(text[i] if not in_code or text[i].isspace() else "?")
+        i += 1
+    return "".join(clean), "".join(markup)
+
+def tags(text):
+    i = 0
+    while i < len(text):
+        start = text.find("<", i)
+        if start < 0:
+            return
+        tag = tag_at(text, start)
+        if tag:
+            yield (start, *tag)
+            i = tag[0]
+        else:
+            i = start + 1
+
+def attributes(attrs):
+    """Read whole attribute values, never attributes quoted inside another value."""
+    values = {}
+    i = 0
+    while i < len(attrs):
+        m = re.match(r"\s*([\w:-]+)(?:\s*=\s*)?", attrs[i:])
+        if not m:
+            i += 1
+            continue
+        name = m.group(1)
+        end = i + m.end()
+        if "=" not in m.group():
+            i = end
+            continue
+        literal = LITERAL.match(attrs, end)
+        if literal:
+            values[name] = ("literal", literal.group()[1:-1])
+            i = literal.end()
+        elif end < len(attrs) and attrs[end] == "{":
+            i = brace_end(attrs, end)
+            values[name] = ("expression", attrs[end + 1:i - 1])
+        else:
+            m = re.match(r"[^\s>]+", attrs[end:])
+            i = end + len(m.group()) if m else end
+    return values
+
+def static_classes(attrs):
+    values = attributes(attrs)
+    kind, value = values.get("className", values.get("class", ("literal", "")))
+    if kind == "expression":
+        value = value.strip()
+        call = re.fullmatch(r"(?:cn|clsx)\s*\((.*)\)\s*", value, re.DOTALL)
+        if call:
+            value = call.group(1)
+        literals = list(LITERAL.finditer(value))
+        remainder = LITERAL.sub("", value)
+        if not literals or (remainder.strip(" \t\r\n,") if call else remainder.strip()):
+            return set()
+        value = " ".join(m.group()[1:-1] for m in literals)
+    return set(value.split()) if "${" not in value else set()
+
+def attribute_value(attrs, name):
+    return attributes(attrs).get(name, ("literal", ""))[1]
+
+def is_eyebrow(m):
+    classes = static_classes(m.group("attrs"))
+    style = attribute_value(m.group("attrs"), "style")
+    uppercase = "uppercase" in classes or re.search(r'''(?:text-transform\s*:\s*uppercase\b|textTransform\s*:\s*["']uppercase["'])''', style)
+    tracking = classes & {"tracking-wide", "tracking-wider", "tracking-widest"} or re.search(r'''(?:letter-spacing\s*:|letterSpacing\s*:\s*(?:["'][^"']+["']|[0-9.]+))''', style)
+    return uppercase and tracking
+
+def is_icon_tile(m, icons):
+    classes = static_classes(m.group("attrs"))
+    return (m.group("icon") in icons
+            and any(re.fullmatch(r"bg-(?:primary|[a-z]+-500)/10", c) for c in classes)
+            and any(re.fullmatch(r"rounded-[a-z0-9]+", c) for c in classes))
+
+def accent_context(text, markup, match, rx):
+    role = r"(?<![A-Za-z0-9])(?:primary|accent|brand|cta|btn|button|link|heading)(?![A-Za-z0-9])"
+    for start, end, name, attrs, closing in tags(markup):
+        if start <= match.start() < end and not closing:
+            classes = static_classes(attrs)
+            badge = any({f"bg-{c}-100", f"text-{c}-700"} <= classes for c in ("green", "emerald"))
+            badge |= name.lower() == "span" and {"rounded-full", "text-xs"} <= classes
+            if badge:
+                return False
+            value = " ".join(classes) + " " + attribute_value(attrs, "style")
+            has_role = re.search(role, " ".join(classes), re.IGNORECASE) or name.lower() in {"a", "button", "link", "h1", "h2", "h3", "h4", "h5", "h6"}
+            return bool(has_role and rx.search(value))
+    left = text.rfind("{", 0, match.start())
+    if left < 0 or text.rfind("}", 0, match.start()) > left:
+        return False
+    declaration = text[max(left, text.rfind(";", left, match.start())) + 1:match.end()]
+    if re.match(r"\s*--(?:primary|accent|brand)(?:-[\w-]+)?\s*:", declaration):
+        return True
+    selector = text[max(text.rfind("}", 0, left), text.rfind("{", 0, left)) + 1:left]
+    return bool(re.search(role, selector, re.IGNORECASE) or re.search(r"(?<![\w-])(?:a|button|h[1-6])(?![\w-])", selector, re.IGNORECASE))
+
+def middle_dot_hits(text, rx):
+    hits = []
+    previous = 0
+    for start, end, *_ in tags(text):
+        run = text[previous:start]
+        archive = re.fullmatch(r"\s*\d{4}\s*·\s*\w+\s*·\s*Archive\s*", run, re.IGNORECASE)
+        hit = rx.search(text, previous, start)
+        if hit and not archive:
+            hits.append(hit)
+        previous = end
+    return hits
+
+def arrow_positions(text):
+    actions = []
+    hits = []
+    for start, end, name, attrs, closing in tags(text):
+        if name.lower() not in {"a", "button", "link"}:
+            continue
+        if not closing and not attrs.rstrip().endswith("/"):
+            actions.append((name, start, end))
+        elif closing and actions and actions[-1][0] == name:
+            _, action_start, body_start = actions.pop()
+            body = text[body_start:start]
+            pieces = []
+            previous = 0
+            for child_start, child_end, *_ in tags(body):
+                pieces.append(body[previous:child_start])
+                previous = child_end
+            pieces.append(body[previous:])
+            label = unescape("".join(pieces)).strip()
+            if label.endswith("→") and label[:-1].strip():
+                hits.append(action_start)
+    return hits
 
 def scan(path, min_sev):
     rules = compile_rules(min_sev)
@@ -145,21 +389,66 @@ def scan(path, min_sev):
             continue  # unreadable file: skip, not fatal
         if len(lines) == 1 and len(lines[0]) > 5000:   # likely minified
             continue
-        for i, line in enumerate(lines, 1):
-            if "unslop-ignore" in line.lower():     # respect intentional choices
-                continue
-            if COMMENT_LINE.match(line):
-                continue
-            for r in rules:
-                if r["suppress_rx"] and r["suppress_rx"].search(line):
+        source, markup_source = source_views("".join(lines), os.path.splitext(fp)[1].lower() in {".css", ".scss", ".sass", ".less", ".js", ".jsx", ".ts", ".tsx", ".json"})
+        source_lines = source.splitlines(keepends=True)
+        markup_lines = markup_source.splitlines(keepends=True)
+        for r in rules:
+            ignored = {i for i, line in enumerate(lines) if "unslop-ignore" in line.lower()
+                       or (r["suppress_rx"] and r["suppress_rx"].search(source_lines[i]))}
+            eligible = [blank(line) if i in ignored else line for i, line in enumerate(source_lines)]
+            text = "".join(eligible)
+            markup = "".join(blank(line) if i in ignored else line for i, line in enumerate(markup_lines))
+            matches = []
+            if r.get("min_signals") or r.get("min_count"):
+                target = text if r.get("min_signals") else markup
+                groups = [list(rx.finditer(target)) for rx in r["rx"]]
+                if r["id"] == "claude-default-look":
+                    groups[2] = [m for m in groups[2] if accent_context(text, markup, m, r["rx"][2])]
+                if r.get("min_signals") and sum(bool(g) for g in groups) < r["min_signals"]:
                     continue
-                for rx in r["rx"]:
-                    m = rx.search(line)
-                    if m:
-                        findings.append({"rule": r["id"], "label": r["label"], "sev": r["sev"],
-                                         "fix": r["fix"], "file": fp, "line": i,
-                                         "snippet": line.strip()[:160]})
-                        break
+                hits = sorted((m for g in groups for m in g), key=lambda m: m.start())
+                if r.get("markup_text"):
+                    hits = middle_dot_hits(markup, r["rx"][0])
+                if r["id"] == "eyebrow-chrome":
+                    hits = [m for m in hits if is_eyebrow(m)]
+                if r["id"] == "tinted-icon-tiles":
+                    imports = re.findall(r"import\s*\{([^}]+)\}\s*from\s*[\"']lucide(?:-[a-z]+)*[\"']", text)
+                    icons = {item.strip().split()[-1] for names in imports
+                             for item in names.split(",") if item.strip()}
+                    hits = [m for m in hits if is_icon_tile(m, icons)]
+                positions = arrow_positions(markup) if r["id"] == "appended-arrow" else [m.start() for m in hits]
+                if len(positions) < r.get("min_count", 1):
+                    continue
+                matches = [text.count("\n", 0, min(positions)) + 1]
+            else:
+                for i, line in enumerate(eligible, 1):
+                    if any(rx.search(line) for rx in r["rx"]):
+                        matches.append(i)
+                if r.get("card"):
+                    literals = [(m.start(), m.group()[1:-1]) for m in LITERAL.finditer(text)]
+                    applies = [(m.start(), m.group(1)) for m in re.finditer(r"@apply\s+([^;{}]+)", text)]
+                    for start, value in literals + applies:
+                        classes = set(value.split())
+                        count = bool(classes & {"rounded-lg", "rounded-xl"})
+                        count += len(classes & {"border", "bg-card", "text-card-foreground", "shadow-sm"})
+                        if count >= 4:
+                            matches.append(text.count("\n", 0, start) + 1)
+                if r.get("config") and os.path.basename(fp) == "components.json":
+                    try:
+                        config = json.loads(text)
+                    except ValueError:
+                        config = None
+                    if isinstance(config, dict):
+                        theme = config.get("tailwind", config)
+                        if (isinstance(theme, dict)
+                                and theme.get("baseColor") in ("slate", "zinc", "neutral", "gray", "stone")
+                                and theme.get("cssVariables", theme.get("cssVars")) is True):
+                            m = re.search(r'"baseColor"\s*:', text)
+                            matches.append(text.count("\n", 0, m.start() if m else 0) + 1)
+            for i in sorted(set(matches)):
+                findings.append({"rule": r["id"], "label": r["label"], "sev": r["sev"],
+                                 "fix": r["fix"], "file": fp, "line": i,
+                                 "snippet": lines[i - 1].strip()[:160]})
     return findings
 
 def verdict(by_sev, weighted):

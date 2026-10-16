@@ -1,6 +1,6 @@
 # Writing in a chosen voice
 
-This file does not hand you a voice to copy. Any fixed style, repeated, becomes the next default and the next tell. The smooth corporate voice was the 2024 default; the clipped, lowercase, swear-to-seem-real voice is the 2026 over-correction, and it reads as a machine trying not to look like a machine just as fast. So this is a way to decide what the writing is, not a thing to imitate.
+This file does not hand you a voice to copy. Any fixed style, repeated, becomes the next default and the next tell. The smooth corporate voice was the 2024 default; the clipped, lowercase, swear-to-seem-real voice is the 2026 over-correction, and it can read as a machine trying not to look like a machine. So this is a way to decide what the writing is, not a thing to imitate.
 
 The goal is one outcome: prose where every choice has a reason specific to this piece. That is the one property a default can never have.
 
@@ -31,7 +31,7 @@ Vary sentence length on purpose. Use the plain word: `use` not `utilize`, `look 
 
 ## The over-correction trap (the thing to actually watch)
 
-Told to "sound less like AI," a model swings the other way: staccato three-word fragments on every beat, forced lowercase, a `here's the thing` cold open, a swear dropped in to seem casual, every natural dash replaced by an ellipsis or a contorted sentence. People clock that just as fast. Evenness is the tell whichever length it lands on; all-short is as mechanical as all-medium. The fix is a real register held consistently, not the absence of voice dressed up as casual.
+Told to "sound less like AI," a model swings the other way: staccato three-word fragments on every beat, forced lowercase, a `here's the thing` cold open, a swear dropped in to seem casual, every natural dash replaced by an ellipsis or a contorted sentence. Wikipedia dates dash overuse to 2022 through September 2026 and reports newer models tuned to avoid dashes, with plain words and short 8-20 word sentences. Dash-free short plain prose is no longer evidence of a human. Review uniform short sentences and punctuation impoverishment, including prose reduced to periods and commas whatever the thought needs. This is a contextual pattern, not an authorship test. The dash ban remains a configured house preference; a project may enforce it with a write-time hook. (source: Wikipedia:Signs of AI writing, 2026-10) The fix is a real register held consistently, not the absence of voice dressed up as casual.
 
 ## A terse register is a choice, not a tell
 

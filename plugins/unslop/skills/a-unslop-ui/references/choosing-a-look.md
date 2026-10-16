@@ -16,7 +16,7 @@ Decide a primary from the project, not the framework. A real brand colour is bes
 
 ## Type
 
-Pick type for a reason and pair it. The reason can be tone (a geometric sans for precision, a humanist serif for warmth), but it has to be a reason. A display face over a separate body face reads as more considered than one face everywhere. Steer off the autopilot picks on both sides: Inter and Geist (the "no choice" default), Instrument Serif, Fraunces, Playfair (the "tasteful choice" default). Not banned, overexposed. Use them only as a real decision, ideally not for the headline that sets the tone.
+Choose one family or two for a reason. The reason can be tone (a geometric sans for precision, a humanist serif for warmth), but it has to be a reason. One family can carry the hierarchy through weight, size, and spacing. If you use two, make them clearly distinct. Steer off the autopilot picks on both sides: Inter and Geist (the "no choice" default), Instrument Serif, Fraunces, Playfair (the "tasteful choice" default). Not banned, overexposed. Use them only as a real decision, ideally not for the headline that sets the tone.
 
 ## Layout
 

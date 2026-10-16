@@ -1,0 +1,7 @@
+{
+  "style": "new-york",
+  "tailwind": {
+    "baseColor": "neutral",
+    "cssVariables": true
+  }
+}

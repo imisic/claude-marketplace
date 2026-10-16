@@ -1,87 +1,51 @@
 #!/usr/bin/env python3
 """
-unslop_code_scan.py - scan source code for the mechanical "tells" that give away
-AI-written code, across languages.
+Scan source code for surface tells and test diffs for weakened checks.
 
-Forked (MIT) from github.com/JCarterJohnson/vibecoded-design-tells; logic and rules unchanged.
-
-Plain Python, standard library only. The patterns and their severity come from a Reddit
-analysis (11,906 on-topic posts + 11,306 comments across 55 AI / coding / SaaS subreddits,
-2020 to 2026) of what developers actually name as a giveaway that code was written by an
-LLM. Every candidate was classified by an LLM into a fixed taxonomy of 19 tells, then each
-top tell was adversarially verified by re-reading the quotes. Severity follows the verified
-share, so the report tells you where to spend effort.
-
-What it can and cannot see. The loudest tells in the data are about shape and substance:
-boilerplate / tutorial-shaped code (verified 18.6%, the #1 tell), hallucinated APIs (11.2%),
-over-engineering (7.8%), ignoring the surrounding codebase (3.5%), mixed skill level (1.9%).
-A regex cannot judge any of those; they are documented in references/tells.md for a human or
-a compiler. This scanner catches the mechanical, surface tells: leftover chat/assistant text,
-placeholder comments, emoji, swallowed errors, narrating comments, and generic placeholder
-names.
-
-Two axes, not one. Severity is how loudly a finding reads as an AI tell (how conclusive it is
-when present). Class is whether it is a bug or a cosmetic. They are independent: a swallowed
-error is a quiet tell but a real bug; an emoji is a loud tell but harmless. Fix every bug-class
-finding because it is wrong, not because it looks AI-written; treat the cosmetic ones as the
-lighter pass.
-
-The highest-impact bug, hallucinated APIs, is invisible to this scanner. Catch it the way only
-code allows: build it, type-check it, run it, resolve every import and call against real docs.
-The scanner is the cheap second pass, never the first.
-
-Language coverage. Some tells are language-universal because they live in comments or strings:
-emoji, leftover chat artifacts, placeholder/ellipsis comments, narrating comments. Others key
-on syntax and are language-specific. Swallowed errors are matched for Python / JS / TS / Java /
-C# / Ruby try-catch and for Go's single-line empty `if err != nil {}`; Rust's `.unwrap()` /
-`let _ =` and Go's `_`-discard are too overloaded to flag by regex without noise, so they are a
-human pass (see references/tells.md). Generic-name detection keys on def / function / func /
-fn / fun / sub.
+Adapted (MIT) from github.com/JCarterJohnson/vibecoded-design-tells, whose Reddit study catalogs developer complaints. Those classifications do not measure scanner precision. Severity sets review priority; class separates bug, substance, and cosmetic findings. Cosmetic findings are advisory. Only bug-class HIGHs should gate review, but the compatible CLI exit code counts all HIGH findings. Structural problems still need execution and human review; see references/tells.md.
 
 Usage:
-    python3 unslop_code_scan.py <path>                 # scan a dir or file
-    python3 unslop_code_scan.py <path> --severity high # only the strongest signals
-    python3 unslop_code_scan.py <path> --json          # machine-readable (for CI)
-    python3 unslop_code_scan.py <path> --max 8         # cap examples shown per rule
+    python3 unslop_code_scan.py <path>
+    python3 unslop_code_scan.py <path> --severity high
+    python3 unslop_code_scan.py <path> --json
+    python3 unslop_code_scan.py <path> --max 8
+    git diff | python3 unslop_code_scan.py --diff
+    python3 unslop_code_scan.py --diff-base REF
 
-A line containing  unslop-ignore  is skipped, for a pattern you are using on purpose.
-Exit code is the number of HIGH-severity findings (0 = none), so CI can gate on it.
+A line containing unslop-ignore is skipped. Exit code is the number of HIGH findings (0 = none); invalid input exits 2.
 """
-import os, re, sys, json, argparse
+import os, re, sys, json, argparse, ast, textwrap, subprocess
 
 EXTS = {".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".rb", ".php",
         ".c", ".h", ".cpp", ".cc", ".hpp", ".cs", ".kt", ".kts", ".swift", ".scala",
         ".m", ".mm", ".sh", ".bash", ".lua", ".dart", ".vue", ".svelte", ".sql", ".r"}
 SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".next", "out", "vendor", "target",
-             "coverage", ".venv", "venv", "__pycache__", ".idea", ".gradle", "bin", "obj"}
+             "coverage", ".venv", "venv", "__pycache__", ".idea", ".gradle", "bin", "obj",
+             "fixtures"}  # test fixtures quote tells on purpose; scan one by path to include it
 W = {"high": 3, "medium": 2, "low": 1}
 # Comment openers across common languages. The SQL/Lua `--` must be followed by a space,
 # or every shell long-flag (`--create`, `--comments`) reads as a comment about creating.
 CMT = r"(?://|\#|/\*|\*|--(?=\s)|<!--)"
 EMOJI = ("\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F0FF"
          "\U00002B00-\U00002BFF\U0001F900-\U0001F9FF\U00002764")
+DEBRIS = r"(?:IMPLEMENTATION_SUMMARY|.+_SUMMARY|COMPLETED|CHANGES_MADE|FIX_NOTES)\.md"
 
-# Each rule: id, label, severity, class, share (the verified data share), fix, patterns.
-# Severity follows the verified shares, with the two conclusive paste-in artifacts raised
-# to HIGH because when they survive into committed code they are unmistakable.
-# Class is the orthogonal axis the goal cares about: "bug" means the code is wrong (it eats a
-# failure, ships unfinished, or will not run) and you fix it on those grounds alone; "cosmetic"
-# means it is the model's chat voice leaking into the file, a lighter surface pass. Severity and
-# class are independent: a swallowed error is MEDIUM severity but a bug; a chat artifact is HIGH
-# severity but cosmetic. The biggest bug (hallucinated APIs) is structural and not in this list.
+# Each rule: id, label, severity, class, share (provenance), fix, patterns.
 RULES = [
-    # ---------- HIGH: the conclusive paste-in artifacts ----------
+    # ---------- HIGH: paste-in artifacts and unfinished code ----------
     {"id": "chat-artifact", "label": "Leftover chat / assistant / markdown artifact in the code", "sev": "high", "class": "cosmetic",
-     "share": "verified 1.2%, but unmistakable when present",
-     "fix": "Delete the assistant's voice before committing: code fences, 'Here's the updated code', 'As an AI', 'Good catch!', a trailing 'Note:'.",
-     "pats": [r"^\s*```", r"\bhere'?s the (updated|complete|full|fixed|revised|new) (code|version|implementation|file)\b",
+     "share": "vibecoded-design-tells; assistant-voice matching narrowed locally",
+     "fix": "Delete the assistant's voice: code fences, 'Here's the updated code', 'As an AI', 'Good catch!', or assistant instructions after 'Note:'.",
+     "pats": [r"^\s*```", r"\b(?:here's|here is) the (updated|complete|full|fixed|revised|new) (code|version|implementation|file)\b",
               r"\bas an? (ai|a\.i\.) (language )?model\b", r"\bas a large language model\b",
-              r"\b(good|great) catch!", r"\byou'?re absolutely right\b",
-              r"^\s*" + CMT + r"\s*(note|remember|important|keep in mind|tip)\s*:",
-              r"\b(certainly|sure)! here('?s| is)\b", r"\bi'?ll (add|update|fix|implement) .{0,40}\bnow\b",
-              r"\bi hope this helps\b", r"\blet me know if you'?d?\s*(like|need|want)\b"]},
+              r"\b(good|great) catch!", r"\b(?:you['’]re|you are) absolutely right\b",
+              r"\bi(?:['’]ve| have)?\s+(?:updated|added|changed|fixed|refactored|implemented)\b", r"\bas requested\b",
+              r"^\s*" + CMT + r"\s*(?:note|remember|important|keep in mind|tip)\b\s*:?\s*(?:you(?:['’]ll| will) need to (?:configure this|add the path|install)\b|to replace the token\b|make sure you run this\b)",
+              r"\breplace the token before running\b", r"\b(?:don['’]t|do not) forget to\b",
+              r"\b(certainly|sure)! here('?s| is)\b", r"\bi(?:['’]ll| will) (add|update|fix|implement) .{0,40}\bnow\b",
+              r"\b(?:i )?hope this helps\b", r"\blet me know\b"]},
     {"id": "placeholder-comment", "label": "Placeholder / ellipsis comment left in (\"// rest of your code\")", "sev": "high", "class": "bug",
-     "share": "verified 1.6%, precision ~100%",
+     "share": "vibecoded-design-tells; unfinished-code marker",
      "fix": "Write the actual code. These '... rest of the code' stubs mean the file is unfinished, not just untidy.",
      "pats": [r"" + CMT + r"\s*\.{2,}\s*(rest|the rest|your|remaining|existing|previous|other)\b",
               r"" + CMT + r"\s*(rest|remainder) of (your |the |my )?(code|implementation|logic|function|file|owl)\b",
@@ -94,47 +58,71 @@ RULES = [
 
     # ---------- MEDIUM: the surface tells ----------
     {"id": "emoji-in-code", "label": "Emoji in code, comments, strings, logs, or commit text", "sev": "medium", "class": "cosmetic",
-     "share": "verified 3.9%, precision ~77% (the highest-precision cosmetic tell)",
+     "share": "house preference; also cataloged by vibecoded-design-tells",
      "fix": "Remove emoji from source. They survive from the model's chat output and read as vibe-coded.",
      "pats": [r"[" + EMOJI + r"]"]},
     {"id": "swallowed-errors", "label": "Catch-all / swallowed errors (bare except, empty catch, empty Go err block)", "sev": "medium", "class": "bug",
-     "share": "verified 3.1% (try/except wrapped around everything)",
-     "fix": "Catch specific exceptions and handle them. A bare except, an empty catch, or an empty `if err != nil {}` eats the one clue you needed.",
-     "pats": [r"^\s*except\s*:", r"^\s*except\s+(Exception|BaseException)\s*:\s*(pass|\.\.\.|$)",
+     "share": "vibecoded-design-tells; Python handler-body check",
+     "fix": "Catch specific exceptions and handle them. Empty or log-only handlers hide failures; propagate or handle the error.",
+     "pats": [r"^\s*except(?:\s+(?:(?:builtins\.)?(?:Exception|BaseException)|\(\s*(?:builtins\.)?(?:Exception|BaseException)\s*,?\s*\))(?:\s+as\s+\w+)?)?\s*:",
               r"\bcatch\s*\([^)]*\)\s*\{\s*\}", r"\bcatch\s*\{\s*\}",
               r"\brescue\s*=>\s*\w+\s*$", r"\bcatch\s*\([^)]*\)\s*\{\s*//",
               r"\bif\s+err\s*!=\s*nil\s*\{\s*\}", r"\bif\s+err\s*!=\s*nil\s*\{\s*//"]},
     {"id": "narrating-comment", "label": "Narrating comment that restates the obvious / step-by-step '# Step 1'", "sev": "medium", "class": "cosmetic",
-     "share": "verified 8.5% (over-commenting; the regex catches the obvious-restatement subset)",
+     "share": "vibecoded-design-tells; adjacent-line restatement or explicit steps",
      "fix": "Cut comments that say what the next line plainly does. Comment why, not what.",
-     "pats": [r"" + CMT + r"\s*(step\s*\d+\b|now we\b|first,|next,|then,|finally,)",
-              r"" + CMT + r"\s*(increment|decrement|initialize|declare|define|create|instantiate|loop (over|through)|iterate over|return the|set the|get the|assign|call the)\b",
-              r"" + CMT + r"\s*this (function|method|line|loop|variable|class|block) (does|is|will|handles|returns|creates)\b",
-              r"" + CMT + r"\s*(import|importing) (the |required )?(libraries|modules|dependencies)\b"],
-     # A narrating comment is short, because it only restates the next line. Past ~70
-     # characters the comment is carrying a reason, which is the kind we want kept.
-     "suppress": r"^.{70,}$"},
+     "pats": [r"^\s*(?://|\#|--(?=\s))\s*(?P<comment>\S.*?)\s*$"]},
     {"id": "generic-naming", "label": "Generic placeholder function name (process_data, handleData, doStuff)", "sev": "medium", "class": "cosmetic",
-     "share": "verified 1.9%, precision ~100% (process_data() is the canonical example)",
+     "share": "vibecoded-design-tells; placeholder-name subset",
      "fix": "Name it for what it actually does in this domain. process_data() that does 11 things is the AI tell.",
      "pats": [r"\b(def|function|func|fn|fun|sub)\s+(process_?[Dd]ata|handle_?[Dd]ata|do_?[Ss]tuff|do_?[Ss]omething|my_?[Ff]unction|process_?[Ii]tem|process_?[Ii]nput|main_?[Ff]unction)\b",
               r"\b(process_?[Dd]ata|handle_?[Dd]ata|do_?[Ss]tuff|do_?[Ss]omething)\s*\("]},
 
     # ---------- LOW: weak / inflated signals ----------
     {"id": "verbose-naming", "label": "Over-verbose, robotically self-documenting identifier", "sev": "low", "class": "cosmetic",
-     "share": "verified 0.4% (inflated; people mostly argue FOR descriptive names)", "cs": True,
+     "share": "vibecoded-design-tells; weak, contextual signal", "cs": True,
      "fix": "A name that is a whole sentence (getUserDataFromApiResponseHandler) reads as machine-generated. Trim it.",
-     "pats": [r"\b[a-z]+([A-Z][a-z0-9]+){4,}\b", r"\b[a-z]+(_[a-z0-9]+){5,}\b"],
+     "pats": [r"^\s*(?:(?:public|protected|private|static|abstract|final|export|default|async|override|open|suspend)\s+)*(?:def|function|func|fn|fun|sub|class)\s+&?(?P<name>[A-Za-z_]\w*)\b",
+              r"^\s*func\s+\([^)]*\)\s+(?P<name>[A-Za-z_]\w*)\b",
+              r"^\s*(?:(?:export|public|protected|private|static|readonly)\s+)*(?:(?:const|let|var)\s+)?(?P<name>\$?[A-Za-z_]\w*)\s*(?::[^=;]+)?=(?!=|>)",
+              r"^\s*(?:(?:public|protected|private|static|async)\s+)*(?P<name>[A-Za-z_]\w*)\s*\([^;{}]*\)\s*(?::[\w<>\[\]|? ]+)?\s*\{",
+              r"^\s*(?:(?:public|protected|private|static|final|readonly)\s+)*(?!(?:return|throw|new|yield|await|raise)\b)[A-Za-z_]\w*(?:<[^>]+>|\[\]|\?)?\s+(?P<name>\$?[A-Za-z_]\w*)\s*(?:\(|=|;)"],
      # A test name is a sentence on purpose: test_returns_none_on_malformed_yaml is the
      # convention, not a tell. Left unsuppressed this rule was 30 of 37 findings on a
      # clean repo, and its own share note already calls the signal inflated.
      "suppress": r"\bdef\s+test|\btest_|\b(it|describe|context|specify)\s*\(|\bfunc\s+Test|@Test\b"},
-    {"id": "boilerplate-marker", "label": "Boilerplate / dummy-data marker (placeholder keys, sample data, 'Successfully' logs)", "sev": "low", "class": "cosmetic",
-     "share": "weak proxy for the #1 tell (tutorial-shaped code), which is otherwise not regex-detectable",
+    {"id": "boilerplate-marker", "label": "Boilerplate / dummy-data marker (placeholder keys, sample data)", "sev": "low", "class": "cosmetic",
+     "share": "vibecoded-design-tells; weak proxy for tutorial-shaped code",
      "fix": "Replace generated dummy data and placeholders with the real thing. Tutorial-shaped sample data is the loudest tell, but only a human can judge the shape.",
      "pats": [r"\blorem ipsum\b", r"\b(your|my)[-_]?api[-_]?key\b", r"\bYOUR_API_KEY\b", r"\bexample\.com\b",
               r"\b(John|Jane) (Doe|Smith)\b", r"['\"]sk-(xxx|your|placeholder|123)",
-              r"(console\.log|print|println|fmt\.Print\w*|System\.out\.print\w*)\s*\(\s*['\"](✅|🚀|Successfully|Done!|Here we go)"]},
+              r"(console\.log|print|println|fmt\.Print\w*|System\.out\.print\w*)\s*\(\s*['\"]Here we go"]},
+    {"id": "checker-suppression", "label": "Checker suppression without a reason", "sev": "medium", "class": "bug",
+     "share": "cursor deslop; advisory bypass check",
+     "fix": "fix the underlying error or add a reason",
+     "pats": [r"#\s*type:\s*ignore\b(?:\s*\[[^\]]*\])?", r"#\s*noqa\b(?::\s*[A-Z]\d+(?:\s*,\s*[A-Z]\d+)*)?",
+              r"@ts-(?:ignore|expect-error)\b", r"eslint-disable(?:-next-line|-line)?\b(?:\s+[\w@/.-]+(?:\s*,\s*[\w@/.-]+)*)?",
+              r"\bas\s+unknown\s+as\b", r"\bas\s+any\b", r":\s*any\b"]},
+    {"id": "change-narration", "label": "Comment narrates an edit instead of explaining the code", "sev": "medium", "class": "cosmetic",
+     "share": "code-humanizer; change-narration comments",
+     "fix": "Remove the edit history or explain the continuing reason for the code.",
+     "pats": [r"(?:#|//|/\*|\*)\s*(?:(?:Updated|Changed|Modified|Fixed|Refactored)\s+(?:to|from|so|the)\b|Now\s+uses\b|Previously\s+(?:this|was)\b|(?:This\s+)?was\s+changed\s+to\b|Old:|New:)"]},
+    {"id": "repo-debris", "label": "Possible leftover implementation summary", "sev": "medium", "class": "cosmetic",
+     "share": "house preference; review whether the file has a continuing purpose",
+     "fix": "Remove transient implementation notes or keep them only for a continuing documentation purpose.",
+     "filename": True, "pats": [r"^" + DEBRIS + r"$"]},
+    {"id": "test-assertion-removed", "label": "Assertion removed from a test", "sev": "high", "class": "bug",
+     "share": "EvilGenie arXiv:2511.21654; METR reward hacking (2025)",
+     "fix": "Restore the check or verify that a changed requirement justifies its removal.",
+     "diff": "-", "pats": [r"(?<![\w.$])assert(?=\s|\()|\b(?:\w+\.)?assert\w*\s*\(|\bexpect\s*\("]},
+    {"id": "test-skip-added", "label": "Skip or expected-failure marker added to a test", "sev": "high", "class": "bug",
+     "share": "EvilGenie arXiv:2511.21654; METR reward hacking (2025)",
+     "fix": "Run the test and fix the failure, or document why the requirement permits skipping it.",
+     "diff": "+", "pats": [r"@pytest\s*\.\s*mark\s*\.\s*(?:skip|skipif|xfail)\b|\bpytest\s*\.\s*mark\s*\.\s*(?:skip|skipif|xfail)\s*\(|\bpytest\s*\.\s*(?:skip|xfail)\s*\(|@(?:unittest\s*\.\s*)?(?:skip|skipIf|skipUnless|expectedFailure)\b|\.\s*skip\s*\(|\b(?:it|test|describe)\s*\.\s*skip\b|\b(?:xit|xdescribe)\s*\(|@Disabled\b|\bt\s*\.\s*Skip(?:f|Now)?\s*\(|(?:->|::)\s*markTest(?:Skipped|Incomplete)\s*\("]},
+    {"id": "test-tautology-added", "label": "Always-true assertion added to a test", "sev": "high", "class": "bug",
+     "share": "EvilGenie arXiv:2511.21654; METR reward hacking (2025)", "cs": True,
+     "fix": "Assert an observable result from the implementation instead of a constant truth.",
+     "diff": "+", "pats": [r"\bassert\s*(?:\(\s*)*True(?:\s*\))*\s*(?:$|[,;])", r"\bexpect\s*\(\s*(?:\(\s*)*true(?:\s*\))*\s*\)\s*\.\s*toBe\s*\(\s*(?:\(\s*)*true(?:\s*\))*\s*\)"]},
 ]
 
 def compile_rules(min_sev):
@@ -160,8 +148,137 @@ def iter_files(path):
         for f in files:
             if f.endswith(".min.js") or f.endswith(".min.css") or f.endswith(".map"):
                 continue
-            if os.path.splitext(f)[1].lower() in EXTS:
+            if os.path.splitext(f)[1].lower() in EXTS or re.fullmatch(DEBRIS, f, re.IGNORECASE):
                 yield os.path.join(root, f)
+
+def finding(rule, fp, number, line, match):
+    return {"rule": rule["id"], "label": rule["label"], "sev": rule["sev"],
+            "class": rule["class"], "share": rule["share"], "fix": rule["fix"],
+            "file": fp, "line": number, "match": match.strip()[:50], "snippet": line.strip()[:160]}
+
+def python_swallow(lines, index):
+    header = re.match(r"^([ \t]*)except[^:]*:(.*)", lines[index])
+    body = [header[2].lstrip() + "\n"]
+    if not header[2].split("#", 1)[0].strip():
+        indent = len(header[1].expandtabs())
+        body = []
+        for line in lines[index + 1:]:
+            if line.strip() and not line.lstrip().startswith("#"):
+                if len(line.expandtabs()) - len(line.expandtabs().lstrip()) <= indent:
+                    break
+            body.append(line)
+    try:
+        statements = ast.parse(textwrap.dedent("".join(body))).body
+    except SyntaxError:
+        return False
+    for node in statements:
+        if isinstance(node, ast.Pass):
+            continue
+        if isinstance(node, ast.Expr):
+            if isinstance(node.value, ast.Constant) and node.value.value is Ellipsis:
+                continue
+            if isinstance(node.value, ast.Call):
+                func = node.value.func
+                if isinstance(func, ast.Name) and func.id == "print":
+                    continue
+                if isinstance(func, ast.Name) and func.id == "error_log":
+                    continue
+                if isinstance(func, ast.Attribute) and func.attr in {"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}:
+                    if ast.unparse(func.value) in {"logger", "logging", "log", "console", "self.logger", "this.logger", "Log"}:
+                        continue
+        return False
+    return True
+
+def suppression_reason(comments, match):
+    tail = comments[match.end():].split("*/", 1)[0]
+    return bool(re.search(r"[a-zA-Z]", tail))
+
+
+def source_views(lines, fp):
+    """Keep offsets while separating code, comments, and quoted data."""
+    quote = block = ""
+    hash_comment = os.path.splitext(fp)[1].lower() not in {".js", ".jsx", ".ts", ".tsx", ".css", ".java", ".go", ".c", ".cpp", ".cs"}
+    for line in lines:
+        code, comments = list(line), [" "] * len(line)
+        i = 0
+        while i < len(line):
+            start = i
+            if block:
+                end = line.find(block, i)
+                i = len(line) if end < 0 else end + len(block)
+                if end >= 0:
+                    block = ""
+                comments[start:i] = line[start:i]
+                code[start:i] = " " * (i - start)
+            elif quote:
+                if line.startswith(quote, i):
+                    i += len(quote)
+                    quote = ""
+                elif line[i] == "\\":
+                    i = min(i + 2, len(line))
+                else:
+                    i += 1
+                code[start:i] = "~" * (i - start)
+            elif line.startswith(("//", "-- "), i) or (hash_comment and line[i] == "#"):
+                comments[i:] = line[i:]
+                code[i:] = " " * (len(line) - i)
+                break
+            elif line.startswith(("/*", "<!--"), i):
+                block = "*/" if line.startswith("/*", i) else "-->"
+            elif line[i] in "\"'`":
+                quote = line[i] * (3 if line.startswith(line[i] * 3, i) else 1)
+                i += len(quote)
+                code[start:i] = "~" * (i - start)
+            else:
+                i += 1
+        # Visible markup text is data too, including prose in PHP templates and JSX.
+        for text in re.finditer(r"<(?!/?(?:script|style)\b)/?[a-z][^>]*>([^<]*)", line, re.IGNORECASE):
+            before = line[:text.start()].rstrip()
+            if re.search(r"[\w)\]]$", before) and not re.search(r"\breturn$", before):
+                continue  # a generic argument list, not an opening markup tag
+            code[text.start(1):text.end(1)] = "~" * len(text[1])
+        yield "".join(code), "".join(comments)
+
+def identifier_words(name):
+    name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", name)
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    return re.findall(r"[a-z]+|\d+", name.lower())
+
+def sentence_identifier(name):
+    if name.lstrip("$").isupper():
+        return False
+    # These conventional compounds each name one concept despite internal capitals.
+    name = name.replace("WebSite", "Website").replace("JsonLd", "Jsonld")
+    words = [word for word in identifier_words(name) if word.isalpha()]
+    return len(words) >= 6
+
+def narrates_next_line(comment, lines, index):
+    if re.match(r"(?:step\s*\d+\b|now we\b|(?:first|next|finally),?\s+we\b)", comment, re.IGNORECASE):
+        return True
+    if index + 1 >= len(lines):
+        return False
+    code = lines[index + 1].strip()
+    if not code or code.startswith(("#", "//", "/*", "*")) or re.match(r"--\s", code):
+        return False
+    words = [word for word in identifier_words(comment) if word not in {"a", "an", "the"}]
+    # Operators have no word tokens, so match increment/decrement explicitly.
+    for verb, operator in (("increment", "+"), ("decrement", "-")):
+        op = re.escape(operator)
+        update = re.fullmatch(rf"(?:(\$?[A-Za-z_]\w*)\s*(?:{op}{op}|{op}=\s*1)|{op}{op}\s*(\$?[A-Za-z_]\w*))\s*;?", code)
+        if update and words == [verb] + identifier_words(update[1] or update[2]):
+            return True
+    return len(words) >= 2 and words == identifier_words(code)
+
+def documented_example(line, match):
+    if re.match(r"\s*(?://|#|/\*|\*|--\s|<!--)", line):
+        return True
+    for attr in re.finditer(r"(?<![\w:-])placeholder\s*=\s*(['\"])(.*?)\1", line, re.IGNORECASE):
+        if attr.start(2) <= match.start() and match.end() <= attr.end(2):
+            return True
+    for text in re.finditer(r"<(?!/?(?:script|style)\b)/?[a-z][^>]*>([^<]*)", line, re.IGNORECASE):
+        if text.start(1) <= match.start() and match.end() <= text.end(1):
+            return True
+    return False
 
 def scan(path, min_sev):
     rules = compile_rules(min_sev)
@@ -172,21 +289,130 @@ def scan(path, min_sev):
                 lines = fh.readlines()
         except OSError:
             continue  # unreadable file: skip, not fatal
+        for r in rules:
+            if r.get("filename") and r["rx"][0].fullmatch(os.path.basename(fp)):
+                if not lines or "unslop-ignore" not in lines[0].lower():
+                    findings.append(finding(r, fp, 1, os.path.basename(fp), os.path.basename(fp)))
+        if fp.lower().endswith(".md"):
+            continue  # debris check is filename-only
         if len(lines) == 1 and len(lines[0]) > 5000:   # likely minified
             continue
+        in_docblock = False
+        views = list(source_views(lines, fp))
         for i, line in enumerate(lines, 1):
+            code, comments = views[i - 1]
+            docblock_line = in_docblock or bool(re.match(r"\s*/\*\*", line))
+            if docblock_line:
+                in_docblock = "*/" not in line
             if "unslop-ignore" in line.lower():
                 continue
             for r in rules:
+                if r.get("diff") or r.get("filename"):
+                    continue
                 if r["suppress_rx"] and r["suppress_rx"].search(line):
                     continue
                 for rx in r["rx"]:
-                    m = rx.search(line)
+                    target = line
+                    if r["id"] == "verbose-naming":
+                        target = code
+                    elif r["id"] == "change-narration":
+                        target = comments
+                    elif r["id"] == "checker-suppression":
+                        target = code if rx.pattern.startswith((r"\bas", r":\s*any")) else comments
+                    m = rx.search(target)
                     if m:
-                        findings.append({"rule": r["id"], "label": r["label"], "sev": r["sev"],
-                                         "class": r["class"], "share": r["share"], "fix": r["fix"],
-                                         "file": fp, "line": i,
-                                         "match": m.group(0).strip()[:50], "snippet": line.strip()[:160]})
+                        if r["id"] == "verbose-naming" and (docblock_line or not sentence_identifier(m["name"])):
+                            continue
+                        if r["id"] == "narrating-comment" and (docblock_line or not narrates_next_line(m["comment"], lines, i - 1)):
+                            break
+                        if r["id"] == "boilerplate-marker" and m.group(0).lower() == "example.com":
+                            m = next((example for example in rx.finditer(line)
+                                      if not (docblock_line or documented_example(line, example))), None)
+                            if m is None:
+                                continue
+                        if r["id"] == "swallowed-errors" and line.lstrip().startswith("except"):
+                            if not fp.lower().endswith(".py") or not python_swallow(lines, i - 1):
+                                break
+                        if r["id"] == "checker-suppression" and suppression_reason(comments, m):
+                            continue
+                        match = m["name"] if r["id"] == "verbose-naming" else m.group(0)
+                        findings.append(finding(r, fp, i, line, match))
+                        break
+    return findings
+
+def is_test_file(path):
+    return bool(re.search(r"(?:^|/)(?:tests|__tests__)/|(?:^|/)test_[^/]+$|(?:^|/)[^/]*_test\.[^/]+$|\.(?:test|spec)\.[^/]+$", path))
+
+def iter_diff_lines(diff, context_sides=False):
+    old_path = new_path = ""
+    old_line = new_line = old_left = new_left = 0
+    for raw in diff.splitlines():
+        if raw.startswith("diff --git "):
+            old_path = new_path = ""
+            old_left = new_left = 0
+        elif not (old_left or new_left) and raw.startswith(("--- ", "+++ ")):
+            path = raw[4:].split("\t", 1)[0]
+            if path.startswith('"'):
+                path = ast.literal_eval(path)
+            path = re.sub(r"^[ab]/", "", path)
+            if raw.startswith("--- "):
+                old_path = path
+            else:
+                new_path = path
+        elif raw.startswith("@@ "):
+            hunk = re.match(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", raw)
+            if hunk:
+                old_line, new_line = int(hunk[1]), int(hunk[3])
+                old_left, new_left = int(hunk[2] or 1), int(hunk[4] or 1)
+        elif (old_left or new_left) and raw[:1] in {"-", "+", " "}:
+            kind = raw[0]
+            path, number = (old_path, old_line) if kind == "-" else (new_path, new_line)
+            if kind == " " and context_sides:
+                yield old_path, old_line, "old-context", raw[1:]
+                yield new_path, new_line, "new-context", raw[1:]
+            else:
+                yield path, number, kind, raw[1:]
+            if kind != "+":
+                old_line += 1; old_left -= 1
+            if kind != "-":
+                new_line += 1; new_left -= 1
+
+def scan_diff(diff, min_sev):
+    rules = [r for r in compile_rules(min_sev) if r.get("diff")]
+    findings = []
+    # Reconstruct each hunk side so strings and block comments retain lexical state.
+    groups, latest = [], {}
+    for fp, number, kind, line in iter_diff_lines(diff, context_sides=True):
+        side = "-" if kind in {"-", "old-context"} else "+"
+        key = fp, side
+        rows = latest.get(key)
+        if rows is None or rows[-1][0] + 1 != number:
+            rows = []
+            latest[key] = rows
+            groups.append((fp, side, rows))
+        rows.append((number, kind, line))
+    for fp, side, rows in groups:
+        if not is_test_file(fp):
+            continue
+        views = list(source_views([line for _, _, line in rows], fp))
+        for index, (number, kind, line) in enumerate(rows):
+            if kind != side or "unslop-ignore" in line.lower():
+                continue
+            code = views[index][0].strip()
+            if not code:
+                continue
+            for r in rules:
+                if r["diff"] != kind:
+                    continue
+                candidate = code
+                if r["id"] == "test-tautology-added" and index + 1 < len(rows) and "unslop-ignore" not in rows[index + 1][2].lower():
+                    following = views[index + 1][0].strip()
+                    if rows[index + 1][1] == "+" and following.startswith("."):
+                        candidate += " " + following
+                for rx in r["rx"]:
+                    m = rx.search(candidate)
+                    if m:
+                        findings.append(finding(r, fp, number, line, m.group(0)))
                         break
     return findings
 
@@ -204,24 +430,44 @@ def verdict(by_sev, weighted):
 
 def main():
     ap = argparse.ArgumentParser(description="Scan source code for AI-written-code tells.")
-    ap.add_argument("path")
+    ap.add_argument("path", nargs="?")
+    ap.add_argument("--diff", action="store_true", help="check test integrity in a git diff read from stdin")
+    ap.add_argument("--diff-base", metavar="REF", help="check test integrity in git diff REF (path selects the repo)")
     ap.add_argument("--severity", choices=["high", "medium", "low"], default="low",
                     help="minimum severity to report (default: low = everything)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--max", type=int, default=10, help="max examples shown per rule (text mode)")
     args = ap.parse_args()
 
-    if not os.path.exists(args.path):
+    if not args.path and not (args.diff or args.diff_base):
+        ap.error("path is required unless --diff or --diff-base is used")
+    if args.path and not os.path.exists(args.path):
         print(f"path not found: {args.path}", file=sys.stderr); sys.exit(2)
 
-    findings = scan(args.path, args.severity)
+    if args.diff or args.diff_base:
+        if args.diff_base:
+            cwd = args.path or "."
+            if os.path.isfile(cwd):
+                cwd = os.path.dirname(os.path.abspath(cwd))
+            try:
+                diff = subprocess.run(["git", "diff", "--no-ext-diff", "--no-color", args.diff_base, "--"], cwd=cwd,
+                                      check=True, capture_output=True, text=True).stdout
+            except (OSError, subprocess.CalledProcessError) as exc:
+                print(f"git diff failed: {exc}", file=sys.stderr); sys.exit(2)
+        else:
+            diff = sys.stdin.read()
+        findings = scan_diff(diff, args.severity)
+        files_scanned = len({fp for fp, _, _, _ in iter_diff_lines(diff) if is_test_file(fp)})
+        args.path = args.path or "."
+    else:
+        findings = scan(args.path, args.severity)
+        files_scanned = sum(1 for _ in iter_files(args.path))
     by_sev, by_class, by_rule = {}, {}, {}
     for f in findings:
         by_sev[f["sev"]] = by_sev.get(f["sev"], 0) + 1
         by_class[f["class"]] = by_class.get(f["class"], 0) + 1
         by_rule.setdefault(f["rule"], []).append(f)
     weighted = sum(W[s] * n for s, n in by_sev.items())
-    files_scanned = sum(1 for _ in iter_files(args.path))
 
     if args.json:
         print(json.dumps({"path": args.path, "files_scanned": files_scanned, "counts": by_sev,
@@ -235,8 +481,9 @@ def main():
     print(f"  files scanned: {files_scanned}   findings: {len(findings)}   slop score: {weighted}")
     print(f"  verdict: {verdict(by_sev, weighted)}")
     print(f"  high: {by_sev.get('high',0)}   medium: {by_sev.get('medium',0)}   low: {by_sev.get('low',0)}")
-    print(f"  bug-class: {by_class.get('bug',0)} (wrong code, fix regardless of severity)   "
-          f"cosmetic: {by_class.get('cosmetic',0)} (surface giveaways)\n")
+    print(f"  bug-class: {by_class.get('bug',0)} (review behavior)   "
+          f"substance: {by_class.get('substance',0)} (review contract)   "
+          f"cosmetic: {by_class.get('cosmetic',0)} (advisory)\n")
     if not findings:
         print("  No surface tells flagged. The loudest tells are structural and a regex cannot see\n"
               "  them: boilerplate / tutorial-shaped code, hallucinated APIs, over-engineering, and\n"
@@ -256,7 +503,7 @@ def main():
         print()
     top = [by_rule[rid][0]['label'] for rid in rule_ids[:3]]
     print("  Top things to change: " + "; ".join(top))
-    print("  Fix the bug-class findings first; they are wrong, not just AI-looking.")
+    print("  Review bug-class findings first; verify the behavior before changing it.")
     print("  The big tells (boilerplate, hallucinated APIs, over-engineering) the regex cannot see:")
     print("  build / type-check / run for the hallucinated calls, read the diff for the rest. See references/tells.md.\n")
     sys.exit(by_sev.get("high", 0))

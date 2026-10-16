@@ -1,0 +1,12 @@
+:root { color: #263643; font-family: "Source Sans 3", sans-serif; line-height: 1.5; }
+body { background: #faf8f5; margin: 0; }
+header, main { max-width: 64rem; margin-inline: auto; padding: 1.5rem; }
+nav { display: flex; gap: 1rem; }
+h1 { font-size: clamp(1.75rem, 4vw, 3rem); line-height: 1.1; }
+a { color: #174d78; text-underline-offset: .2em; }
+input, button { font: inherit; border: 1px solid #647789; border-radius: .25rem; padding: .5rem .75rem; }
+button { color: white; background: #174d78; cursor: pointer; }
+:focus-visible { outline: 3px solid #174d78; outline-offset: 3px; }
+table { border-collapse: collapse; width: 100%; margin-block: 2rem; }
+th, td { text-align: left; border-bottom: 1px solid #c8ced3; padding: .75rem; }
+@media (max-width: 40rem) { header, main { padding: 1rem; } }

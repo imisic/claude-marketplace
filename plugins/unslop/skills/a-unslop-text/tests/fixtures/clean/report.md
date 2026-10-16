@@ -1,0 +1,15 @@
+# Archive move: storage and access
+
+The crucial decision is whether readers can request boxes during the move. We propose keeping the reading room open on Tuesdays and Thursdays, with requests due by noon on the previous working day. That gives staff time to fetch material before the packing crew starts. Readers who need several boxes should send the catalogue references together, so staff can check the storage location in one visit.
+
+Each box will keep its current reference number. The move does not change the catalogue or the order of files inside a box. Staff will attach a second label to the lid because the original label may be hidden when boxes are stacked on the trolley. The new label must show the reference in full. Shortened references caused confusion during the last shelf check, when two collections used the same final digits.
+
+The packing crew will work on one aisle at a time. A member of the archive team will check the list before each trolley leaves the room and sign it when the boxes reach the new shelves. The signed lists will stay at the desk until the catalogue locations have been updated. If a box cannot be found, staff should mark it as awaiting a location check and keep the request open. They should not tell the reader that the material has been lost before checking both rooms.
+
+Some maps are stored flat and will need a separate trip. We have asked the transport team to bring trays that fit the cabinet drawers. Staff can measure the trays against an empty drawer before the first map is packed. The largest sheets must stay flat during loading and unloading. If the trays do not fit, the maps will remain in the current room until the team agrees on another method. The rest of the move can continue.
+
+The desk will keep a paper copy of each day's request list in case the network is unavailable. This copy should contain references and collection titles, with reader contact details held in the booking system. Before closing, staff will record completed requests in the system and put the working copy in the locked waste bin. Requests carried over to the next day should be copied onto the next list before the old one is destroyed.
+
+The vital check after the move is that a reader can request a box and receive the right material. On the first morning, someone who did not pack the boxes will choose ten catalogue records and follow the normal request process. Record the shelf position and the time needed for each request. Any wrong location should be corrected in the catalogue before the reading room opens. A missing label should be replaced from the signed transport list, with a second person checking the reference.
+
+We will review the request process after two weeks. The review needs the number of requests received, the number completed on the requested day, and the reason for each delay. It does not need a new survey or a separate reporting tool. Staff can keep a short note beside the existing desk log and bring it to the Friday meeting. The team will use those notes to decide whether the temporary request deadline can be removed.

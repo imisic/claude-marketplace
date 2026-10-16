@@ -19,4 +19,6 @@ The tools leave style choices to you. They flag the patterns, and you choose cha
 
 Each linked page carries the full case for its skill: what it catches, what it deliberately refuses to do, and the trap it watches for that the obvious fix walks into.
 
+Version 1.5.0 updates all three against 2026 research. The writing tool can compare a rewrite with the original and list any number, URL, negation or modal verb that went missing or appeared (`--compare`), the code tool flags diffs that weaken tests, and the design tool knows the newer stock looks, not just the old purple gradients.
+
 Every scanner reports file, line, and fix, plus a severity-weighted score, and exits non-zero on high-severity findings so a CI job can stop when it fails. All three tell catalogs and scanner designs are adapted from the [vibecoded-design-tells](https://github.com/JCarterJohnson/vibecoded-design-tells) research (MIT), a large-scale study of what people actually name when they call something AI-written, AI-coded, or AI-designed.
