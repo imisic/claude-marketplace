@@ -4,7 +4,7 @@
 # Every project review skill calls this instead of carrying its own shell arithmetic, so a scope bug fixed here is fixed everywhere and two projects never disagree about what "since the last review" means. Mode resolution mirrors the engine's scope section, in this order:
 #
 #   --base <ref>          range              an explicit base always wins
-#   uncommitted changes   working-tree       the state the user is looking at
+#   uncommitted changes   working-tree       the state the user is looking at, untracked (non-ignored) files included
 #   capture log present   since-last-review  newest `date` in .claude/reviews/review-issues.jsonl names when the last run looked; the newest commit before it is the base
 #   no capture log        since-last-review  last 24 hours of commits, said so in `note`
 #   nothing in range      empty
@@ -82,11 +82,14 @@ resolve_since_last_review() {
   fi
 }
 
+# Untracked, non-ignored files. An untracked nested repository is listed as `dir/`: it is not a file of this repo, and `cat` on it used to abort the whole run with exit 123.
+untracked_files() { git ls-files --others --exclude-standard -z | { grep -zv '/$' || true; }; }
+
 if [ -n "$base_arg" ]; then
   base=$(git rev-parse --verify -q "${base_arg}^{commit}") || { echo "review-scope: --base $base_arg is not a commit" >&2; exit 2; }
   mode="range"
-elif [ -n "$(git diff --name-only HEAD)" ]; then
-  # shortcut: untracked files are not in `git diff HEAD`, so a brand-new file is out of scope until it is staged. Add `git ls-files --others --exclude-standard` here if that bites.
+elif [ -n "$(git diff --name-only HEAD)" ] || [ -n "$(untracked_files | tr -d '\0')" ]; then
+  # Untracked files count as changes: `git diff HEAD` leaves out a brand-new file, so a review of new code used to come back `empty`. Ignored files stay out (--exclude-standard), and nothing is staged.
   mode="working-tree"
   base="HEAD"
   range_mode="worktree"
@@ -96,7 +99,14 @@ fi
 
 if [ "$range_mode" = worktree ]; then
   mapfile -d '' files < <(git diff --name-only -z HEAD)
+  mapfile -d '' untracked < <(untracked_files)
   diff_bytes=$(git diff HEAD | wc -c)
+  if [ ${#untracked[@]} -gt 0 ]; then
+    files+=("${untracked[@]}")
+    # A new file's diff is its whole content, so its size stands in for diff bytes (minus a few header lines, close enough for the Coverage line).
+    diff_bytes=$((diff_bytes + $(printf '%s\0' "${untracked[@]}" | xargs -0 cat -- | wc -c)))
+    note="${note:+$note; }${#untracked[@]} untracked file(s) included, not staged"
+  fi
 else
   mapfile -d '' files < <(git diff --name-only -z "$base"...HEAD)
   diff_bytes=$(git diff "$base"...HEAD | wc -c)

@@ -1,5 +1,19 @@
 # dev-workflow-forge changelog
 
+## 1.8.0
+
+Preflight checks that could not run now say so. A scanner that crashed, or exited for a reason other than finding something, reports `error` instead of `pass`, and the review treats `error` as unknown rather than clean. The JSON comes from a serializer, so a message holding a quote or a newline no longer produces invalid output.
+
+The preflight template now ships its tool-backed groups: secret scanning with `gitleaks dir` read from a JSON report, dependency scanning with the `osv-scanner` v2 CLI, structural patterns with `ast-grep`, and a test-gap check. The old dependency recipe read the wrong JSON field and reported a vulnerable lockfile as clean.
+
+Working-tree reviews include new files you have not staged. Previously a review of brand-new code came back empty. Ignored files and untracked nested repositories stay out.
+
+Duplicate findings are merged by location plus mechanism, not by file and line alone, so two separate defects on one line stay two findings and one cause spread over several lines becomes one.
+
+`a-review-optimizer` writes only what is specific to your project and leaves the shared engine to `a-review-core`. It no longer adds a finder rule that drops any finding missing a field, and it whitelists a dismissed finding only when the pattern is shown to be safe. Weaker dismissals stay in the review log. The report template gains an Impact column.
+
+`a-rules-optimizer`'s glob checker finds rule files in subfolders, reads YAML flow lists and inline comments, accepts absolute paths, sees new files you have not staged, flags scoped rules that are symlinks to outside the project, and has a `--json` flag. The notes on when a path-scoped rule loads were re-measured on Claude Code 2.1.301: it loads after the read or write that touches a matching file, so it cannot shape the first write of a new file. The compression check snapshots the working copy, so your uncommitted edits count, and stops with an error if the snapshot is missing instead of reporting a clean pass. `--audit-only` no longer writes audit stamps.
+
 ## 1.7.0
 
 Whole-tree reviews now also read everything changed since the last review, line by line. Checklists only find patterns that have already shipped, so new bug shapes in recent changes were slipping through.

@@ -21,7 +21,7 @@ No `paths:` field. A rule file without one loads every session, with or without 
 
 Leave a rule unscoped only when it genuinely matters regardless of which file is being edited (e.g., architecture layer rules, fundamental conventions). Default to `paths:` scoping.
 
-That default holds for reference material only. `paths:` fires when Claude **reads** a matching file and stays silent when it **writes** one, so prohibitions, access inventories, and any rule governing a write-heavy workflow stay unscoped however large they are. Shrink those rather than scoping them. Full decision rule and the measured trigger behavior: SKILL.md Phase 2e.
+That default holds for reference material only. `paths:` loads a rule only after Claude has read or written a matching file, which is too late for the first write of a new file and never happens for an action that touches no file, so prohibitions, access inventories, and any rule governing a write-heavy workflow stay unscoped however large they are. Shrink those rather than scoping them. Full decision rule and the measured trigger behavior: SKILL.md Phase 2e.
 
 ### Additional frontmatter notes
 

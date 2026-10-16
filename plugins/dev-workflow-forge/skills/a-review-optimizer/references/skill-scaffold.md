@@ -100,7 +100,8 @@ These patterns are correct in THIS project; agents must not flag them:
 ```
 
 **The growth mechanism (make the optimizer do this every run):**
-- When Post-Flight Reconciliation *dismisses* a preflight finding as a false positive, that dismissal is knowledge. Add it here under a dated `### Added by a-review-optimizer [DATE]` marker, with the file:line and the one-line reason it's safe.
+- When Post-Flight Reconciliation *dismisses* a preflight finding because the pattern is demonstrably safe in this project, that dismissal is knowledge. Add it here under a dated `### Added by a-review-optimizer [DATE]` marker, with the file:line, the one-line reason it's safe, and how far it reaches (this call site, this module, every call of this shape). Scope it to what the evidence covers: one unusual safe call does not exempt every call with the same spelling.
+- Other dismissals stay in the capture log (`--dismissed`) and do NOT become whitelist entries: insufficient evidence, runtime path not covered, out of scope for this run, or real debt accepted for now. Whitelisting those turns "we did not prove it" into "never look again".
 - Never delete an existing whitelist entry unless you confirmed (via grep of current code) the referenced pattern is gone. Stale-looking entries still catch things.
 - Keep the user's original wording verbatim; only append. A rephrased whitelist entry is a whitelist entry the user can no longer trust.
 - Prefer a real referent (`file:line`) over prose; it lets the next run verify the entry is still live.

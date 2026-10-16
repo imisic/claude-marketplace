@@ -1,6 +1,6 @@
 # Review Output Format Template
 
-Use this when building a new review skill from scratch (Phase 4, no existing skill). The format enforces fix readiness on every finding.
+Use this when building a new review skill from scratch (Phase 4, no existing skill). It illustrates the report a core-based skill produces; the authoritative shape is `a-review-core` §7 (finding contract) and §8 (report), so where the two disagree the core wins and this file is the one to fix.
 
 ## Report Template
 
@@ -21,17 +21,17 @@ Use this when building a new review skill from scratch (Phase 4, no existing ski
 | Low | X |
 
 ## Critical Issues (Fix Before Merge)
-| # | Agent | File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out |
-|-|-|-|-|-|-|-|
-| 1 | Security | src/auth.py:44 | admin credential hardcoded as a string literal | value read from an environment variable instead | Hardcoded credential accessible to anyone with repo access | No test-fixture marker, no allowlist entry, and the two sibling auth paths both read from env |
+| # | Agent | File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out | Impact |
+|-|-|-|-|-|-|-|-|
+| 1 | Security | src/auth.py:44 | admin credential hardcoded as a string literal | value read from an environment variable instead | Hardcoded credential accessible to anyone with repo access | No test-fixture marker, no allowlist entry, and the two sibling auth paths both read from env | failure_scenario: anyone with read access to the repo signs in as admin with the literal value |
 
 ## High Priority
-| # | Agent | File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out |
-|-|-|-|-|-|-|-|
+| # | Agent | File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out | Impact |
+|-|-|-|-|-|-|-|-|
 
 ## Medium Priority
-| # | Agent | File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out |
-|-|-|-|-|-|-|-|
+| # | Agent | File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out | Impact |
+|-|-|-|-|-|-|-|-|
 
 ## Low Priority
 [Summary count by category: individual items not listed]
@@ -115,23 +115,20 @@ Low-priority findings are summarized by category (no individual table entries) t
 
 ## Agent Output Constraint
 
-Include this in every agent prompt to enforce the format:
+Finders and verifiers get different rules, because the contract binds after verify (core §5 item 9, §7). Include the finder block in every finder prompt:
 
 ```
-OUTPUT RULES:
+OUTPUT RULES (finder):
 - Final response under 3000 characters
-- List findings, not your reasoning process
-- Every finding: File:Line | Current Code | Proposed Fix | Why | Intent Ruled Out | Impact
-- Impact is failure_scenario (correctness) or cost (maintainability), never both, never neither.
-  Do NOT invent a failure_scenario for a duplication finding so it passes the gate; count the cost
-- If you can't fill the fields, investigate more or drop the finding
-- Intent Ruled Out: name the evidence that this is not deliberate (an adjacent comment, a
-  sibling doing the same, a rule or allowlist). If you cannot find it, say intent-unverified
-  instead of asserting a defect
-- Group by severity: Critical first, then High, Medium
-- Do not list Low-severity items individually: summarize count by category
-- End with: "FINDINGS: X critical, X high, X medium, X low"
+- List candidates, not your reasoning process
+- Each candidate: file | line | one-line summary | failure_scenario (correctness) or cost (maintainability)
+- Pass through every candidate with a nameable failure scenario or counted cost, even if
+  you only half believe it. Verify exists so you can afford to be wrong; do not pre-filter
+- Do NOT invent a failure_scenario for a duplication candidate; count the cost instead
+- End with: "CANDIDATES: N"
 ```
+
+The six columns above are filled at reconciliation for the candidates verify kept, and an incomplete one is rejected there, not at the finder. Low-severity findings are still summarized by category in the report.
 
 ## Verifier Output Constraint
 

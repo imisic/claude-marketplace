@@ -131,7 +131,7 @@ Assemble each brief from these, and hand the agent files rather than summaries o
      node "<core-dir>/../a-rules-optimizer/scripts/verify-rule-globs.js" --for "$f"
    done
    ```
-   That resolver uses the same matcher Claude Code uses, so it answers with the rules that would really load. Hand the rule file itself: a summary is one edit away from disagreeing with the original. This wiring is necessary rather than redundant, because a path-scoped rule fires on a read and not on a write, and loads into a delegated subagent rather than the main thread, so a dispatched review is exactly the case where rules do not arrive on their own.
+   That resolver uses the same matcher Claude Code uses, so it answers with the rules that would really load. Hand the rule file itself: a summary is one edit away from disagreeing with the original. This wiring is necessary rather than redundant, because a path-scoped rule loads only after a matching file is read or written (measured on 2.1.301, 2026-10-16), and into the subagent that touched the file rather than the one that dispatched it, so a dispatched review is exactly the case where rules do not arrive on their own.
    **A change that violates a project rule is a finding**, cited as the rule file and what it says, in the rule's own words. One calibration: rules steer code as it is WRITTEN, so not every line of them is reviewable. "Prefer X when starting a new module" has nothing to say about a two-line bug fix. Flag a violation when the changed code contradicts a rule, not when it merely fails to advance one, and remember that a rule the code deliberately silences is already excluded by the taxonomy below.
 
    **Adherence belongs to the dimension that owns the subject, not to a new agent.** A payments rule violation is a Security finding that happens to cite a rule file. Giving adherence its own agent guarantees it re-reports what the other dimensions already found. The exception is a project whose rules are mostly cross-cutting conventions with no natural owner, where a thin conventions dimension is cleaner than smearing them across three briefs.
@@ -313,7 +313,7 @@ Split the auto-fixable list into safe (no logic change) and needs-confirmation (
 
 Before the report is presented:
 
-1. **Dedup** by file:line, keeping the owning agent's version.
+1. **Dedup** by location plus mechanism, keeping the owning agent's version. Two candidates are one finding when they name the same file:line *and* the same failure mechanism or check ID. Two independent defects in one expression (an injection and a missing timeout on the same call) stay two findings, and one root cause spanning several lines is one finding listing all its lines. The same key applies to the pre-verify dedup in §6. File:line alone merges the first case and splits the second.
 2. **Account for every preflight finding.** Each must appear as confirmed with context, or dismissed with a specific reason. One that appears in no agent report was dropped, and a dropped check is a silent failure.
 3. **Reject incomplete findings** against the §7 contract.
 4. **Apply the severity gate** by project impact rather than generic rules.

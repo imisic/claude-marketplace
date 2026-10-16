@@ -2,7 +2,7 @@
 
 Use this during the pattern-inventory phase and when generating preflight scripts. Pick the scripts relevant to the project's stack.
 
-All scripts are designed to be safe (|| true suffix, head limits on output) and produce file:line locations.
+All scripts produce file:line locations. They are pattern sketches for exploring a tree in Phase 2, where a silenced crash costs little. **Before lifting one into a preflight script, remove its `2>/dev/null || true`**: around a `python3` probe that suffix turns an unreadable file or a syntax error into the same empty hit list as a clean tree (preflight-template.md, rule 3). A delimiter-counting or multiline-regex probe is also not a parser: parentheses inside strings and comments throw it off, so prefer Python's `ast` module or ast-grep for syntax-sensitive checks.
 
 ## Patterns That Can Be Proven To Fire
 
@@ -519,56 +519,15 @@ These checks require external tools. Availability-gate each on the binary's pres
 
 ### Secret Detection with gitleaks
 
-Gitleaks detects hardcoded secrets and API keys. Output format is file:line, and exit code 1 if secrets found, 0 if clean.
+Gitleaks detects hardcoded secrets and API keys. Projects that deliberately commit `.env` files (private, single-user repos, for instance) need an allowlist (`.gitleaksignore` or a config allowlist) to suppress false positives; record why in a comment so maintainers understand the exception.
 
-Caveat: projects that deliberately commit .env files (private, single-user repos, for instance) need an allowlist to suppress false positives. Record the allowlist in a comment so maintainers understand the exception.
-
-```bash
-# Baseline check without allowlist
-if command -v gitleaks >/dev/null 2>&1; then
-    gitleaks detect --source . -r 2>/dev/null | grep -E '^[^:]+:[0-9]+:' | head -30 || true
-else
-    echo "gitleaks not installed, skipped" >&2
-fi
-
-# With allowlist (for projects that deliberately track .env)
-if command -v gitleaks >/dev/null 2>&1; then
-    gitleaks detect --source . -r --exit-code 0 2>/dev/null | while read line; do
-        # Suppress findings that are in the allowlist (e.g., intentional .env commits)
-        echo "$line" | grep -v '.env:' || true
-    done | head -30
-else
-    echo "gitleaks not installed, skipped" >&2
-fi
-```
+Use the GL-01 block in `preflight-template.md` rather than an inline recipe. Three things it gets right that the old recipe here did not, verified 2026-10-16: `detect` is deprecated since v8.19 in favour of `gitleaks dir`; `-r` is `--report-path` and takes a value, so findings come from a `-f json -r <file>` report rather than scraped stdout; and gitleaks exits 1 for leaks AND for errors, so `--exit-code 3` is needed to tell a finding from a broken run. A scanner that exits non-zero for an unrelated reason must emit `error`, never `pass`.
 
 ### Dependency Vulnerability Scanning with osv-scanner
 
-osv-scanner queries the OSV (Open Source Vulnerabilities) database against manifest files. It outputs JSON with advisory IDs, package names, and severity ratings. Findings are NOT file:line (there is no line in a manifest that fixes a dependency); report the advisory ID and severity instead.
+osv-scanner queries the OSV (Open Source Vulnerabilities) database against manifests and lockfiles: package-lock.json (npm), composer.lock (PHP), requirements.txt / pyproject.toml (Python), go.mod (Go), Gemfile.lock (Ruby), and others. Findings are NOT file:line (there is no line in a manifest that fixes a dependency); report the package, advisory ID and source manifest instead.
 
-Supports: package-lock.json (npm), composer.lock (PHP), requirements.txt / pyproject.toml (Python), go.mod (Go), Gemfile.lock (Ruby), and others.
-
-```bash
-# Baseline check
-if command -v osv-scanner >/dev/null 2>&1; then
-    osv-scanner --lockfile=. --json 2>/dev/null | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    if 'results' not in data: sys.exit(0)
-    for result in data['results']:
-        pkg_name = result.get('package', {}).get('name', 'unknown')
-        for vuln in result.get('vulnerabilities', []):
-            severity = vuln.get('severity', 'UNKNOWN')
-            advisory = vuln.get('id', 'unknown')
-            print(f'{pkg_name}: {advisory} [severity: {severity}]')
-except:
-    sys.exit(0)
-" | head -30
-else
-    echo "osv-scanner not installed, skipped" >&2
-fi
-```
+Use the DEP-01 block in `preflight-template.md`. The JSON nests vulnerabilities under `results[].packages[].vulnerabilities[]`, so the old recipe here, which read `result.vulnerabilities` and swallowed every exception, reported a vulnerable lockfile as clean. The v2 CLI is `osv-scanner scan -r <dir> --format json`.
 
 ### Structural Code Patterns with ast-grep
 

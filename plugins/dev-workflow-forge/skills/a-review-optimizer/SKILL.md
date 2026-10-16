@@ -262,7 +262,9 @@ MISSING PREFLIGHT CHECKS
 
 Apply targeted improvements based on the gap analysis. Follow the preservation tags from Phase 1. Default is KEEP: only touch what has a concrete reason to change.
 
-### 4a: Enhance Agent Prompts
+**Write the project's delta, never the engine.** Each step below is labelled by owner. *Project-owned* content is what this phase writes. *Inherited* content lives in `a-review-core` and a skill that reads the core gets it for free: do not add it, and do not "fix" its absence. A target skill that has not adopted the core still carries its own engine copy; propose the core's migration (its "How a project skill adopts this" section, a subtraction that keeps every project caveat) rather than patching the copy, and if the user declines, leave the copy's mechanics alone. The one exception is a mechanic that contradicts the core in a way that loses findings, such as a finder-level "drop anything missing a field" rule: flag it as `UPDATE` with the core section it contradicts.
+
+### 4a: Enhance Agent Prompts (project-owned, except the output shape)
 
 For each agent, check its preservation tag. If it's KEEP, don't touch it. If UPDATE, apply these additions/edits while keeping the existing prompt structure intact:
 
@@ -290,22 +292,9 @@ ${PREFLIGHT_SECURITY_FINDINGS}
 For each: confirm it's real, add context about why it matters here, and look for similar patterns nearby.
 ```
 
-**OUTPUT CONSTRAINT**: every finding must include all 5 fields:
-```
-Every finding MUST include:
-1. File:Line: exact location
-2. Current code: the line(s) as they exist
-3. Proposed fix: what it should look like
-4. Why: one sentence, specific to this project (not generic)
-5. Intent ruled out: what you checked to confirm this is not deliberate. A comment on
-   the thing itself, a sibling doing the same, a rule or allowlist naming it. If the
-   current behaviour has a plausible reason to exist, state it and why it still fails.
-   If you cannot find the reason, mark the finding intent-unverified rather than
-   asserting a defect.
-Findings missing any field are incomplete. Do not include them.
-```
+**OUTPUT SHAPE: inherited, do not add one.** Finders return the core's candidate shape (core §5 item 9: `file`, `line`, `summary`, `failure_scenario` or `cost`), and the six-field finding contract (core §7, which carries the Intent ruled out field) is filled for survivors after verify. A finder-level "every finding MUST include N fields, otherwise do not include it" constraint makes finders drop half-believed candidates before the verifier ever sees them, which the core names as the dominant cause of misses. If the existing skill carries one, `UPDATE` it out and keep any project-specific wording it held (an extra field the project genuinely needs belongs in the post-verify contract, not at the finder).
 
-Field 5 is the one that stops inverted fixes: a correct claim about how something works does not establish that it is wrong. Ask what would break if the fix landed and the behaviour turned out to be intentional. The whitelists this skill maintains are the reactive half of the same problem, paid one false positive at a time; field 5 is the preventive half.
+Intent ruled out is the field that stops inverted fixes: a correct claim about how something works does not establish that it is wrong. The whitelists this skill maintains are the reactive half of the same problem, paid one false positive at a time; that field is the preventive half. It lives in the core, so a project brief needs only its project-specific evidence sources (an allowlist file, a decisions log) if it has them.
 
 ### 4b: Generate Preflight Script
 
@@ -328,23 +317,9 @@ For multi-line pattern detection (the #1 source of false negatives in grep-based
 - Scan backward/forward N lines for required companion patterns
 - Parse indent-based blocks for Python
 
-### 4c: Add Reconciliation Rules
+### 4c: Reconciliation (inherited)
 
-Add a post-review section that ensures nothing falls through cracks:
-
-```
-## Post-Flight Reconciliation
-
-After all agents return:
-
-1. DEDUP: Same file:line from multiple agents → keep the one from the owning agent
-2. PREFLIGHT CHECK: Every preflight finding must appear in an agent report as either:
-   - Confirmed (with expanded context and fix)
-   - Dismissed (with specific reason why it's a false positive)
-   If a preflight finding is missing from all reports, it was dropped. Flag it.
-3. COMPLETENESS: Reject findings missing file:line, current code, proposed fix, or why.
-4. SEVERITY GATE: Apply severity levels based on project-specific impact, not generic rules.
-```
+Post-flight reconciliation is core §9: dedup, accounting for every preflight finding, rejecting incomplete findings against the §7 contract, the severity gate, and the written reason for a dismissed `INJ-*` hit. Do not add a copy. Write only a project-specific addition the core cannot know, such as a check whose dismissal needs a named reason beyond `INJ-*`, and label it as an addition to §9.
 
 ### 4d: Apply Changes Using Preservation Tags
 
@@ -386,16 +361,16 @@ Added by a-review-optimizer: this section did not exist in the original skill.
 - Remove existing check items just because they're not in your gap analysis (they might catch things you haven't seen yet)
 - Rephrase project-specific conventions documentation (the user wrote it in their own words for a reason)
 
-### 4e: Wire Modes, Self-Learning, and Rule Candidates
+### 4e: Wire Modes, Self-Learning, and Rule Candidates (project-owned parts only)
 
 Beyond the agent prompts and preflight, a mature skill carries a set of structural sections that make it as capable as a hand-tuned one. Read `references/skill-scaffold.md` and, for each section, check whether the target skill has it. Missing sections are `ADD`; thin ones are `UPDATE`. Preserve any the user already tuned. This step only ever adds.
 
 - **Flag surface** (§1): `--changed` default, plus `--full` / `--security-only` / `--debt` / `--all` where the project warrants them.
-- **Execution / dispatch** (§2): dimensions dispatched through a mechanism that actually returns each agent's report (in Claude Code that is the Workflow tool; a bare batch of background Agent calls is the superseded form, because those agents go idle without delivering anything back and the review silently reports nothing), an Owns / Does-NOT-check scope table (this is where Phase 3c overlap resolutions get written down), preflight findings split by check-ID prefix into each agent's `PREFLIGHT KNOWN ISSUES` block, and an adversarial verify stage on every finding.
-- **Context Awareness (DO NOT flag)** (§3): a centralized whitelist that GROWS: every preflight finding the review *dismisses* as a false positive gets appended here under a dated `### Added by a-review-optimizer [DATE]` marker with a real file:line referent. This is the same append discipline as 4d; do it for the whitelist, not just the agent prompts.
+- **Execution / dispatch** (§2): dispatch, its fallback and verify are inherited from the core. The project supplies the Owns / Does-NOT-check scope table (where Phase 3c overlap resolutions get written down) and the check-ID-to-agent routing that feeds each agent's `PREFLIGHT KNOWN ISSUES` block.
+- **Context Awareness (DO NOT flag)** (§3), a centralized whitelist that GROWS: a preflight finding the review *dismisses as a demonstrably safe project pattern* gets appended here under a dated `### Added by a-review-optimizer [DATE]` marker with a real file:line referent and its reach. Dismissals for thin evidence, uncovered runtime paths, scope or accepted debt stay in the capture log instead (scaffold §3). This is the same append discipline as 4d; do it for the whitelist, not just the agent prompts.
 - **`--debt` mode** (§4): points-per-severity scoring (Critical 8 / High 4 / Medium 2 / Low 1, cap 100), a per-agent breakdown table, tightened thresholds, and an Auto-Fixable safe-vs-needs-confirmation split.
 - **`--full` mode** (§5): component + layer Mermaid diagrams (scan the stack's import mechanism, cross-layer edges only) and a weighted Architecture Health Score. Skip for projects with no real layered structure.
-- **Self-learning capture loop** (§6): emit `.claude/scripts/capture-finding.sh`, a `Capture Findings for Self-Learning (MANDATORY)` section (one RUN_ID per run, one call per confirmed finding), and a seeded stable category-slug table. This wires the skill into `a-self-learner`.
+- **Self-learning capture loop** (§6): emit `.claude/scripts/capture-finding.sh` and a seeded stable category-slug table. The capture protocol itself (one RUN_ID per run, one call per confirmed finding, dismissals too) is core §10; a skill that reads the core does not restate it. This wires the skill into `a-self-learner`.
 - **Rule candidates** (§7): surface any pattern hit in 3+ locations as a proposed rule for `.claude/rules/`, asking before adding.
 - **Stack detection** (§8): if the project ships more than one stack (and most do: a server language plus browser JS plus SQL migrations plus CLI tooling), move stack specifics into `references/stack-*.md` gated on the changed paths. Check whether the target skill's briefs assume one language; if they do, the minority stacks are being reviewed with the wrong checklist, and that is a real gap rather than a tidiness issue.
 
@@ -424,8 +399,7 @@ Present to the user:
    [UPDATE] Preflight script: appended 4 new checks (SUB-01, WEB-01, TYPE-01, TYPE-02)
    [UPDATE] Agent scope overlap: Security no longer checks exception handling (Architecture owns it)
    [UPDATE] Stale reference: updated src/web/views/old_view.py:33 → src/web/views/dashboard.py:45
-   [ADD] Fix Readiness Requirement: findings now require 5 fields
-   [ADD] Post-flight reconciliation: preflight findings verified against agent output
+   [UPDATE] Finder brief: removed "drop findings missing a field" (contradicts core §5 item 9; the contract binds after verify)
    ```
 
 5. **Verification checklist**: specific things the user should test to confirm the improved skill works:
@@ -435,7 +409,7 @@ Present to the user:
    1. bash .claude/scripts/preflight-comprehensive.sh | python3 -m json.tool  (valid JSON?)
    2. /example-review --full  (catches known issues X, Y, Z from our analysis?)
    3. Check: zero duplicate findings across agents
-   4. Check: every finding has file:line + current code + fix + why + intent ruled out
+   4. Check: every reported Critical/High/Medium finding carries the six core §7 fields (file:line, current code, fix, why, intent ruled out, impact)
    ```
 
 ---
@@ -496,7 +470,7 @@ Before delivering (improve or from-scratch), confirm the skill can produce each 
 - [ ] **`--debt` mode**: points-per-severity score, per-agent breakdown table, Auto-Fixable safe-vs-needs-confirmation split (`skill-scaffold.md` §4).
 - [ ] **`--full` mode**: component + layer Mermaid diagrams and an Architecture Health Score (`skill-scaffold.md` §5).
 - [ ] **Flag surface**: `--changed` (default), `--full`, `--security-only`, `--debt`, `--all` (`skill-scaffold.md` §1).
-- [ ] **Post-flight reconciliation**: dedup by owning agent, every preflight finding accounted (confirmed/dismissed), completeness reject, severity gate (Phase 4c).
+- [ ] **Post-flight reconciliation**: inherited from core §9 for a skill that reads the core; only a skill still carrying its own engine needs it in its own text (Phase 4c).
 - [ ] **Self-learning loop**: emits `capture-finding.sh`, a mandatory capture section with one RUN_ID per run, and a stable kebab-case slug table feeding `a-self-learner` (`skill-scaffold.md` §6).
 - [ ] **Rule candidates**: recurring pattern (3+ locations) → propose a rule for `.claude/rules/`, ask before adding (`skill-scaffold.md` §7).
 - [ ] **Context Awareness whitelist that grows**: a centralized DO-NOT-flag section; dismissed false positives appended each run under a dated marker (`skill-scaffold.md` §3).

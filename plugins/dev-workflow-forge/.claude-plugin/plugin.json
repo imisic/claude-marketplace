@@ -2,7 +2,7 @@
   "name": "dev-workflow-forge",
   "displayName": "Dev Workflow Forge: Code Review Skills and Rules",
   "description": "Generate a code review skill and coding rules fitted to your own repository, then improve them from what your reviews keep finding. You start each generator yourself, and the learning loop asks before it applies any change.",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "author": {
     "name": "Ivan Misic",
     "url": "https://ivanmisic.net"

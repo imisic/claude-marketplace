@@ -23,7 +23,7 @@ If no `.claude/rules/` directory exists, create it and build rules from scratch.
 
 **Rules prevent what reviews catch.** Every rule should map to something that would otherwise be flagged during code review. If a rule doesn't prevent a real mistake, it's noise.
 
-**Path scoping saves context.** Rules scoped to `src/web/**/*.py` don't load when editing `src/core/`. Use the narrowest glob that covers the files where the rule matters. It also fires less often than it looks: `paths:` is reliable for reference material consulted during a read and unreliable for anything that must govern a write, so run the Phase 2e decision rule before adding it to any file.
+**Path scoping saves context.** Rules scoped to `src/web/**/*.py` don't load when editing `src/core/`. Use the narrowest glob that covers the files where the rule matters. It also fires later than it looks: a scoped rule loads after the tool call that touched the matching file, so it is reliable for reference material consulted during a read and for read-then-edit work, and too late for the first write of a new file or for an action that touches no file at all. Run the Phase 2e decision rule before adding it to any file.
 
 **`@imports` to rule files defeat path-scoping.** If `CLAUDE.md` references a rule file with `@.claude/rules/foo.md`, that file is force-loaded at session start regardless of its `paths:` frontmatter. Always reference rule files by name only ("see `services.md`") so the path scoping the user wrote actually takes effect.
 
@@ -263,14 +263,14 @@ done | sort -rn
 cd /path/to/project && node /path/to/this/skill/scripts/verify-rule-globs.js
 ```
 
-It resolves the same minimatch Claude Code bundles (the 2.1.220 and later binaries carry minimatch's own `exports.GLOBSTAR` and `Minimatch` class), tests every `paths:` entry against `git ls-files` (falling back to an on-disk check for a literal path, so a gitignored-but-real target like `.env` isn't called dead), prints a match count per pattern, and exits 1 when a rule file has no live pattern at all. `--for <path>` answers the reverse question: which rules load when a given file is read. After installing or updating this plugin, run `npm ci --prefix /path/to/this/skill/scripts` once. The pinned dependency stays beside the skill, not in your global npm installation. Never substitute a shell glob for this check. `**` semantics differ between shells and minimatch, so a pattern you rewrote to make the shell happy proves nothing about the real matcher.
+It resolves the same minimatch Claude Code bundles (the 2.1.220 and later binaries carry minimatch's own `exports.GLOBSTAR` and `Minimatch` class), discovers rule files recursively as Claude Code does, reads block lists, flow lists (`["a", "b"]`) and comma strings, tests every `paths:` entry against tracked plus untracked-but-not-ignored files (falling back to an on-disk check for a literal path, so a gitignored-but-real target like `.env` isn't called dead), prints a match count per pattern, and exits 1 when a rule file has no live pattern at all or is a scoped symlink pointing outside the project. `--for <path>` answers the reverse question: which rules load when a given file is read or written. Add `--json` to either form for parsing. After installing or updating this plugin, run `npm ci --prefix /path/to/this/skill/scripts` once. The pinned dependency stays beside the skill, not in your global npm installation. Never substitute a shell glob for this check. `**` semantics differ between shells and minimatch, so a pattern you rewrote to make the shell happy proves nothing about the real matcher.
 
 **Then measure what ONE read actually costs, and optimize that number rather than per-file size.** Per-file bytes are a proxy. The bill actually paid is the sum of every rule that loads together for one file, and rules that individually look reasonable stack into something that isn't. Take a baseline before changing anything, on five or six files chosen to span the tree (one per subsystem, plus one in the purest layer the architecture has):
 
 ```bash
 for p in <representative files>; do
-    printf '%9s  %s\n' \
-      "$(node /path/to/this/skill/scripts/verify-rule-globs.js --for "$p" | rg -o 'read: [0-9]+' | rg -o '[0-9]+')" "$p"
+    node /path/to/this/skill/scripts/verify-rule-globs.js --for "$p" --json \
+      | python3 -c 'import json,sys; d=json.load(sys.stdin); print("%9d  %s" % (d["total_bytes"], d["target"]))'
 done
 ```
 
@@ -279,13 +279,15 @@ Then read the baseline for two things:
 - **The floor**: what EVERY file pays. A rule scoped to `src/**/*.py` is effectively unconditional for that language, so it belongs in the floor even though the measurement calls it `scoped`. Sum the floor and ask, rule by rule, whether a file in the project's purest layer can actually violate it. On one hex-architecture project the answer was no for a 16KB build rule that loaded on a `core/` file forbidden from doing I/O at all.
 - **The stack**: which files pay several large rules at once. Those are where a split pays, and they are usually leaf adapters, which is also where most edits land.
 
-Re-run the identical command after the changes and report before/after per file. A total-bytes figure across the directory is the wrong headline: a good pass often moves total bytes barely at all, because nothing was deleted, it just stopped loading where it does not apply.
+This is the cost of one file's own rules, not what a session has accumulated after touching several files; the helper does not measure the latter. Re-run the identical command after the changes and report before/after per file. A total-bytes figure across the directory is the wrong headline: a good pass often moves total bytes barely at all, because nothing was deleted, it just stopped loading where it does not apply.
 
-**What `paths:` actually does** (verified 2026-07-27, three controlled runs with an `InstructionsLoaded` hook). These were measured, not assumed. Don't re-derive them:
+**What `paths:` actually does** (re-measured 2026-10-16 on Claude Code 2.1.301: one fresh headless session per operation, an `InstructionsLoaded` hook logging beside `PreToolUse`/`PostToolUse` so the order is visible). Re-measure on a new major build rather than trusting either this list or a docs sentence; the 2026-07-27 run on 2.1.220 logged no load at all for a write, and that no longer holds.
 
-- A path-scoped rule loads when Claude **reads** a file matching the glob. The hook logs `load_reason: path_glob_match` with a `trigger_file_path`.
-- It does **not** load when Claude **writes** a matching file without having read one first. No warning, no log line, no rule.
-- When the read is delegated to the `Explore` subagent, the rule loads into **that subagent**, not the main thread. The main thread then writes the file without it. Claude auto-delegates reads to `Explore` routinely, so this is the common case, not a corner case.
+- A path-scoped rule loads when Claude **reads** a matching file, with the Read tool or a single-file `cat`. The hook logs `load_reason: path_glob_match` with a `trigger_file_path`.
+- A **Write** to a matching file also triggers the load, as the docs say, but the hook fires **after** `PostToolUse Write`. The file was composed and written before the rule reached context, so a rule cannot shape the first write of a new file. It governs the edits that follow.
+- An **Edit** is governed, because the Edit tool refuses to run without a prior Read of the file, and that Read loads the rule first.
+- When the read is delegated to a subagent, the rule loads into **that subagent** (the hook carries its `agent_id`), not the main thread. The main thread then writes the file without it. Claude auto-delegates reads to `Explore` routinely, so this is the common case, not a corner case.
+- An action that touches no matching file (a shell command, a `git push`, a deploy) never loads a scoped rule. Not measured for Bash commands that write a file (`sed -i`, a redirect); assume they do not trigger it.
 
 Three more, measured the same way on 2026-07-28 against 2.1.220 (still holding on later builds) by reading back the `globs` array the hook reports:
 
@@ -375,10 +377,19 @@ A block that reproduces reality is a safe cut. A block that turns out **stale or
 Match identifier **shapes**, never backtick pairs. A ``​`...`​`` pattern looks like the obvious way to catch commands and paths, and it silently breaks: any literal backtick inside a code span (a shell regex such as ``^[a-zA-Z0-9 !#$%&'*+-.^_`|~=/]*$`` contains one) throws off the pairing for the rest of the line, so tokens after it are never extracted and the check reports losses that did not happen. Unwrapping prose makes this worse, because one paragraph is now one long line and the mis-pairing cascades across all of it. This produced a full page of false LOST lines on a real run.
 
 ```bash
+# Step 1, BEFORE editing. Note the printed path: shell variables do not survive to the next tool call.
 T=.claude/rules/foo.md                     # or CLAUDE.md
-S=/tmp/trim-$(basename "$T")               # per-file name; distinct per file in a batch
-git show "HEAD:$T" > "$S.pre"              # or cp "$T" "$S.pre" if not committed
-# after editing, extract shapes from the pre-image and substring-check each one:
+S="$(mktemp -d)/$(printf '%s' "$T" | tr '/' '_')"   # unique per run: two same-named files never collide
+cp "$T" "$S.pre" && echo "pre-image: $S.pre"        # the working copy, so uncommitted user edits are in it
+```
+
+No `trap ... EXIT` on that directory: the snapshot has to outlive the shell that took it, because the check below runs in a later call.
+
+```bash
+# Step 2, AFTER editing. Set T and S again; S is the printed path minus `.pre`.
+T=.claude/rules/foo.md
+S=/tmp/tmp.XXXXXXXXXX/.claude_rules_foo.md
+[ -s "$S.pre" ] || { echo "NO PRE-IMAGE at $S.pre: the check cannot run"; exit 1; }
 rg -oN -e '[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]+)?' \
        -e '[0-9]{4}-[0-9]{2}-[0-9]{2}' \
        -e '[A-Za-z0-9_*.-]+\.(lan|net|com|local|io|dev)\b' \
@@ -390,9 +401,9 @@ rg -oN -e '[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]+)?' \
 while IFS= read -r id; do rg -qNF -- "$id" "$T" || echo "LOST: $id"; done < "$S.ids"
 ```
 
-Any `LOST:` line is a regression: restore the identifier or abandon that edit. Two refinements learned from running this for real. First, on a `CLAUDE.md` trim a missing identifier does not always mean data loss: if the block was de-duplicated into a file the session still loads (a rule file, or the doc that CLAUDE.md names as source of truth), the identifier moved rather than died. So re-check each hit against the whole repo, `rg -F -- "$id" .claude/rules/ docs/`, and only treat it as a loss when it survives nowhere the session will read. Second, an identifier that genuinely vanished usually means a block you classified as derivable was carrying an access pointer or an exact command in passing, which is precisely what the never-strip list protects.
+Snapshot the working copy, not `git show HEAD`: a pre-image from HEAD leaves out the user's uncommitted edits, so the check can pass while those edits are gone. Any `LOST:` line is a regression: restore the identifier or abandon that edit. Two refinements learned from running this for real. First, on a `CLAUDE.md` trim a missing identifier does not always mean data loss: if the block was de-duplicated into a file the session still loads (a rule file, or the doc that CLAUDE.md names as source of truth), the identifier moved rather than died. So re-check each hit against the whole repo, `rg -F -- "$id" .claude/rules/ docs/`, and only treat it as a loss when it survives nowhere the session will read. Second, an identifier that genuinely vanished usually means a block you classified as derivable was carrying an access pointer or an exact command in passing, which is precisely what the never-strip list protects.
 
-The pattern cannot check the last item on that list, so read the diff yourself as a separate pass and confirm the "why this exists" sentence is still there. A compressed rule that no longer says which incident produced it reads as unmotivated and gets deleted by the next audit.
+The identifier check is one layer, and surviving tokens do not prove surviving meaning: it cannot see a dropped flag on a command whose name survived, a lost negation or exception, or a broken relationship between two rules. So read the diff yourself as a separate pass for exact commands with their flags, exceptions and negations, and the "why this exists" sentence. A compressed rule that no longer says which incident produced it reads as unmotivated and gets deleted by the next audit.
 
 When several files were produced from one pre-image, check each identifier against the **whole set** at once (`rg -qNF -- "$id" newA.md newB.md newC.md`), not against one file, or every relocated line reports as lost.
 
@@ -404,7 +415,7 @@ For every path in the ORIGINAL file's `paths:`, confirm the split still reaches 
 git show HEAD:.claude/rules/<original>.md | sed -n '/^paths:/,/^---$/p' \
   | rg -o '"[^"]+"' | tr -d '"' | while read -r p; do
     [ -e "$p" ] || { printf '%-55s MISSING FILE\n' "$p"; continue; }
-    loaded=$(node /path/to/this/skill/scripts/verify-rule-globs.js --for "$p" | rg -o '<prefix>[a-z-]*\.md' | sort -u | tr '\n' ' ')
+    loaded=$(node /path/to/this/skill/scripts/verify-rule-globs.js --for "$p" --json | python3 -c 'import json,sys; print(" ".join(r["rule"] for r in json.load(sys.stdin)["rules"]))')
     printf '%-58s %s\n' "$p" "${loaded:-NONE}"
   done
 ```
@@ -449,6 +460,8 @@ Based on the coverage analysis, determine what needs to change. Follow these pri
 - Add missing rules for relevant uncovered dimensions
 - Prefer adding to existing rule files over creating new ones
 - New rules must be written as instructions, not code examples
+- Name each new rule's source in the Phase 5 report: an explicit requirement, a domain invariant, a confirmed recurring defect, a framework requirement, or an observed convention. Prevalence alone does not make a rule: repeated code can be a repeated defect, and an invariant can have live violations. An observed convention is proposed, not written, and a rule is never dropped just because current code violates it
+- When a machine can detect the violation, propose the check beside the rule (a preflight check or an existing linter rule)
 
 ### Priority 5: Reduce Redundancy (clarity)
 - Remove duplicates (keep in the most specific file)
@@ -457,7 +470,7 @@ Based on the coverage analysis, determine what needs to change. Follow these pri
 - **Exception: path-visibility duplication is intentional.** Before deleting a "duplicate," check the two files' `paths:` scopes. If the source-of-truth file is scoped to a directory that never loads when editing the file type where the rule is actually violated, the restatement is load-bearing, not noise. (Real case: a "no inline event handlers" rule in `js-standards.md` scoped `public/js/**` never loaded while editing PHP views, where every regression happened; the rule had to be restated in the views-scoped file with a cross-reference.) Keep both; ensure the restatement carries a one-line "source of truth: X" pointer.
 
 ### What NOT to Change
-- The user's organizational structure (number of files, file names, section headings)
+- The user's organizational structure (number of files, file names, section headings). One exception: a Priority 2b split adds files when one file carries disjoint rule sets, keeps the original name for the largest piece, and is reported with its reason. A user who asked for a no-restructure pass gets the split as a recommendation instead
 - Working rules that are correctly scoped and accurate
 - Project-specific conventions the user documented from experience
 - The level of detail the user chose (some projects have dense rules, some have sparse ones)
@@ -468,7 +481,7 @@ Based on the coverage analysis, determine what needs to change. Follow these pri
 
 ### 4a: Run-Stamp Convention
 
-Every rule file this skill audits gets a one-line HTML comment footer recording the audit date:
+Every rule file this skill audits in an apply mode (`--full` or `--sync`) gets a one-line HTML comment footer recording the audit date. `--audit-only` writes nothing, stamps included:
 
 ```html
 <!-- rules-optimizer: audited YYYY-MM-DD -->
@@ -550,6 +563,8 @@ Before declaring Phase 4 done, scan every file you created or touched against th
 - **Duplicates**: same rule appears in two files (or restates something already in `CLAUDE.md` or the global `~/.claude/CLAUDE.md`).
 - **Stale references**: file paths or line numbers that no longer match the code (drift).
 - **Unscoped when it should be scoped**: a `paths:`-less rule file that only applies to one part of the tree *and* is reference material (Phase 2e). A prohibition scoped to one part of the tree stays unconditional; compress it instead.
+- **Scoped when it should be unconditional.** `paths:` on a prohibition, an access inventory, or any rule governing a write-heavy workflow. It loads only after a matching file was already written, never for an action that touches no file, and into the subagent instead of the main thread when the read is delegated (Phase 2e). Compress the file and remove the `paths:` block instead.
+- **Skill duplication.** A section restates a catalog or procedure an installed skill already owns. Excise that section, leave a pointer to the skill, keep the rest of the file (Phase 2e).
 - **Inventory dump**: directory trees, lists of controllers/models/services/partials/routes, base-class method signatures, helper indexes, design-token catalogs. Replace with one-line pointers (`Inventory: ls path/`, `Methods: read path/Base.php`).
 - **`@import` trap**: `CLAUDE.md` references a rule file with `@.claude/rules/foo.md`. That force-loads it every turn and breaks `paths:` scoping. Replace with a plain mention (`see foo.md`).
 - **All-generic, zero-domain.** The set covers security/quality/architecture but encodes none of the project's own enum semantics, status machines, subsystem contracts, or cross-entity invariants (Phase 2a domain dimensions). A rule set a reviewer could have written without reading this codebase is under-covering it.

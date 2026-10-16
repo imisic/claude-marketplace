@@ -13,40 +13,28 @@ Use this as the skeleton when generating a project-specific preflight script in 
 set -euo pipefail
 
 SRC_DIR="${1:-src/}"
-RESULTS_FILE=$(mktemp)
-# A probe is allowed to abort the run (rule 3), which skips the rm at the end,
-# so cleanup belongs on the trap rather than the happy path.
-trap 'rm -f "$RESULTS_FILE"' EXIT
+# One work dir holds the results and every tool report. A probe is allowed to
+# abort the run (rule 3), which skips anything at the end, so cleanup is a trap.
+WORK=$(mktemp -d)
+RESULTS_FILE="$WORK/results.jsonl"
+trap 'rm -rf "$WORK"' EXIT
 
-# Initialize JSON output
-echo '{' > "$RESULTS_FILE"
-FIRST=true
-
+# Statuses: pass, info, warn, fail, error. `error` means the check could not
+# run or its tool failed; the review core treats it as unknown, never as clean.
 emit() {
+    # JSON comes from a serializer, never from shell interpolation: a message
+    # holding a quote, backslash or newline used to produce invalid JSON.
+    # Locations arrive as one newline-separated argument ("$LOCS", quoted) or as
+    # separate arguments. Never pass $LOCS unquoted: a path with a space splits.
     local id="$1" status="$2" count="$3" message="$4"
     shift 4
-    # Remaining args are locations
-    local locations="[]"
-    if [ $# -gt 0 ]; then
-        locations=$(printf '%s\n' "$@" | python3 -c "
-import sys, json
-print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))")
-    fi
-
-    if [ "$FIRST" = true ]; then
-        FIRST=false
-    else
-        echo ',' >> "$RESULTS_FILE"
-    fi
-
-    cat >> "$RESULTS_FILE" <<ITEM
-  "$id": {
-    "status": "$status",
-    "count": $count,
-    "message": "$message",
-    "locations": $locations
-  }
-ITEM
+    python3 -c '
+import json, sys
+id_, status, count, message, *locs = sys.argv[1:]
+locations = [l.strip() for a in locs for l in a.split("\n") if l.strip()]
+print(json.dumps({"id": id_, "status": status, "count": int(count),
+                  "message": message, "locations": locations}))
+' "$id" "$status" "$count" "$message" "$@" >> "$RESULTS_FILE"
 }
 
 # ============================================================
@@ -58,7 +46,7 @@ HITS=$(rg -n '[PATTERN]' --type [TYPE] "$SRC_DIR" 2>/dev/null || true)
 COUNT=$(printf '%s' "$HITS" | grep -c . || true)
 if [ "$COUNT" -gt 0 ]; then
     LOCS=$(echo "$HITS" | awk -F: '{print $1":"$2}')
-    emit "SEC-01" "fail" "$COUNT" "$COUNT [description]" $LOCS
+    emit "SEC-01" "fail" "$COUNT" "$COUNT [description]" "$LOCS"
 else
     emit "SEC-01" "pass" "0" "No [description] found"
 fi
@@ -97,7 +85,7 @@ for f in pathlib.Path('$SRC_DIR').rglob('*.py'):
 COUNT=$(printf '%s' "$HITS" | grep -c . || true)
 if [ "$COUNT" -gt 0 ]; then
     LOCS=$(echo "$HITS" | awk -F: '{print $1":"$2}')
-    emit "SUB-01" "warn" "$COUNT" "$COUNT subprocess calls without timeout" $LOCS
+    emit "SUB-01" "warn" "$COUNT" "$COUNT subprocess calls without timeout" "$LOCS"
 else
     emit "SUB-01" "pass" "0" "All subprocess calls have timeout"
 fi
@@ -126,13 +114,153 @@ HITS=$(find "$SRC_DIR" -name '*.py' -o -name '*.php' -o -name '*.ts' -o -name '*
 COUNT=$(printf '%s' "$HITS" | grep -c . || true)
 if [ "$COUNT" -gt 0 ]; then
     LOCS=$(echo "$HITS" | awk -F: '{print $1}')
-    emit "QUAL-01" "info" "$COUNT" "$COUNT files over 300 lines" $LOCS
+    emit "QUAL-01" "info" "$COUNT" "$COUNT files over 300 lines" "$LOCS"
 else
     emit "QUAL-01" "pass" "0" "No oversized files"
 fi
 
 # ============================================================
-# GROUP F: Performance Checks (route to Performance Agent)
+# GROUP F: Tool-Backed Security Checks (route to Security Agent)
+# ============================================================
+
+# GL-01: gitleaks secret detection (gitleaks v8.19+, which added the `dir` subcommand)
+# Gitleaks exits 1 for leaks AND for errors, so --exit-code moves "leaks found" to 3
+# and any other non-zero code is a broken run, emitted as `error` with its stderr.
+# Findings come from the JSON report, never from scraping terminal output.
+# Some projects deliberately commit .env files; support an allowlist (.gitleaksignore).
+if command -v gitleaks >/dev/null 2>&1; then
+    GL_RC=0
+    gitleaks dir "$SRC_DIR" --no-banner --redact -f json -r "$WORK/gitleaks.json" \
+        --exit-code 3 >/dev/null 2>"$WORK/gitleaks.err" || GL_RC=$?
+    if [ "$GL_RC" -ne 0 ] && [ "$GL_RC" -ne 3 ]; then
+        emit "GL-01" "error" "0" "gitleaks exited $GL_RC, not scanned: $(head -c 400 "$WORK/gitleaks.err")"
+    elif ! HITS=$(python3 -c '
+import json, sys
+for f in json.load(open(sys.argv[1])) or []:
+    print("%s:%s: %s" % (f["File"], f["StartLine"], f["RuleID"]))
+' "$WORK/gitleaks.json" 2>"$WORK/gitleaks-parse.err"); then
+        emit "GL-01" "error" "0" "gitleaks report unreadable: $(tail -n 1 "$WORK/gitleaks-parse.err")"
+    else
+        COUNT=$(printf '%s' "$HITS" | grep -c . || true)
+        if [ "$COUNT" -gt 0 ]; then
+            LOCS=$(printf '%s\n' "$HITS" | head -30)
+            emit "GL-01" "fail" "$COUNT" "$COUNT potential secrets detected by gitleaks (verify against project allowlist)" "$LOCS"
+        elif [ "$GL_RC" -eq 3 ]; then
+            emit "GL-01" "error" "0" "gitleaks reported leaks (exit 3) but the report lists none"
+        else
+            emit "GL-01" "pass" "0" "No secrets detected by gitleaks"
+        fi
+    fi
+else
+    emit "GL-01" "info" "0" "gitleaks not installed, skipped, no secret-scan coverage (install via: apt install gitleaks or go install github.com/gitleaks/gitleaks/v8@latest)"
+fi
+
+# ============================================================
+# GROUP G: Dependency Vulnerability Checks (route to Security Agent)
+# ============================================================
+
+# DEP-01: osv-scanner dependency vulnerabilities (osv-scanner v2 CLI)
+# Scans manifests and lockfiles (package-lock.json, composer.lock, go.mod, etc.).
+# Findings are advisory IDs, not file:line, so report package, advisory and source.
+# Exit 0 = clean, 1 = vulnerabilities, 128 = nothing to scan; anything else is a
+# broken run. 127/128 are not on the official usage page, so treat an unknown
+# code as `error` rather than guessing. Vulnerabilities nest under
+# results[].packages[].vulnerabilities[]; reading result.vulnerabilities finds none.
+if command -v osv-scanner >/dev/null 2>&1; then
+    OSV_RC=0
+    osv-scanner scan -r "$SRC_DIR" --format json >"$WORK/osv.json" 2>"$WORK/osv.err" || OSV_RC=$?
+    if [ "$OSV_RC" -eq 128 ]; then
+        emit "DEP-01" "info" "0" "osv-scanner found no manifests or lockfiles, nothing scanned"
+    elif [ "$OSV_RC" -ne 0 ] && [ "$OSV_RC" -ne 1 ]; then
+        emit "DEP-01" "error" "0" "osv-scanner exited $OSV_RC, not scanned: $(head -c 400 "$WORK/osv.err")"
+    elif ! HITS=$(python3 -c '
+import json, sys
+data = json.load(open(sys.argv[1]))
+for r in data.get("results") or []:
+    src = (r.get("source") or {}).get("path", "?")
+    for p in r.get("packages") or []:
+        pkg = p.get("package") or {}
+        for v in p.get("vulnerabilities") or []:
+            print("%s@%s %s (%s)" % (pkg.get("name", "?"), pkg.get("version", "?"), v.get("id", "?"), src))
+' "$WORK/osv.json" 2>"$WORK/osv-parse.err"); then
+        emit "DEP-01" "error" "0" "osv-scanner report unreadable: $(tail -n 1 "$WORK/osv-parse.err")"
+    else
+        COUNT=$(printf '%s' "$HITS" | grep -c . || true)
+        if [ "$COUNT" -gt 0 ]; then
+            emit "DEP-01" "warn" "$COUNT" "$COUNT dependency vulnerabilities found (review and update vulnerable packages)" "$(printf '%s\n' "$HITS" | head -20)"
+        elif [ "$OSV_RC" -eq 1 ]; then
+            emit "DEP-01" "error" "0" "osv-scanner reported vulnerabilities (exit 1) but the report lists none"
+        else
+            emit "DEP-01" "pass" "0" "No known dependency vulnerabilities"
+        fi
+    fi
+else
+    emit "DEP-01" "info" "0" "osv-scanner not installed, skipped, no dependency coverage (install from https://github.com/google/osv-scanner/releases)"
+fi
+
+# ============================================================
+# GROUP H: Structural Pattern Checks (route to Quality Agent)
+# ============================================================
+
+# AST-01: ast-grep structural pattern matching (requires ast-grep binary)
+# Use project-specific YAML rules or inline patterns; example rule for Python below.
+# Regex cannot match nested structures; ast-grep catches what grep misses.
+# Gate on `ast-grep`, NEVER on its documented short alias `sg`: on Linux /usr/bin/sg
+# is shadow-utils' set-group command (package `login`), so `command -v sg` succeeds on
+# a machine with no ast-grep and the check then runs the wrong binary. Verified on
+# Mint 22.3, 2026-08-29. ast-grep is not in apt there either.
+if command -v ast-grep >/dev/null 2>&1; then
+    # Example: Python subprocess without timeout (ast-grep version, more reliable than regex)
+    HITS=$(ast-grep --pattern 'subprocess.$_($_)' --lang py "$SRC_DIR" 2>/dev/null | grep -E '^[^:]+:[0-9]+:' || true)
+    COUNT=$(printf '%s' "$HITS" | grep -c . || true)
+    if [ "$COUNT" -gt 0 ]; then
+        LOCS=$(echo "$HITS" | awk -F: '{print $1":"$2}' | head -30)
+        emit "AST-01" "warn" "$COUNT" "$COUNT subprocess calls (verify they have timeout=)" "$LOCS"
+    else
+        emit "AST-01" "pass" "0" "No subprocess call patterns detected"
+    fi
+else
+    emit "AST-01" "info" "0" "ast-grep not installed, skipped (npm i -g @ast-grep/cli, cargo install ast-grep, or a release binary)"
+fi
+
+# ============================================================
+# GROUP I: Test Coverage Gap Detection (route to Quality Agent)
+# ============================================================
+
+# TESTGAP-01: changed lines with no test changes (diff-cover style)
+# Use diff-cover when available; fall back to git-based check for test file parallels
+if command -v diff-cover >/dev/null 2>&1 && { [ -f ".coverage" ] || [ -d "htmlcov" ]; }; then
+    REPORT=$(diff-cover --fail-under=0 --compare-branch=main .coverage 2>/dev/null | grep -E 'Missing lines:' | head -10 || true)
+    COUNT=$(printf '%s' "$REPORT" | grep -c . || true)
+    if [ "$COUNT" -gt 0 ]; then
+        emit "TESTGAP-01" "warn" "$COUNT" "Changed lines with incomplete test coverage (run full coverage report)" "$REPORT"
+    else
+        emit "TESTGAP-01" "pass" "0" "Changed lines have test coverage"
+    fi
+elif [ -d ".git" ]; then
+    # Fallback: git-based check for test file parallels (no coverage data)
+    CHANGED_SRC=$(git diff HEAD --name-only --diff-filter=ACM 2>/dev/null | grep -E '\.(py|php|js|ts)$' | grep -v test_ | grep -v _test | head -20 || true)
+    TEST_COUNT=0
+    for src in $CHANGED_SRC; do
+        # Check if a corresponding test file changed
+        test_name=$(echo "$src" | sed 's|^|test_|' -e 's|/|/test_|')
+        if git diff HEAD --name-only 2>/dev/null | grep -q "$test_name"; then
+            TEST_COUNT=$((TEST_COUNT + 1))
+        fi
+    done
+    SRC_COUNT=$(printf '%s' "$CHANGED_SRC" | grep -c . || true)
+    if [ "$SRC_COUNT" -gt 0 ] && [ "$TEST_COUNT" -lt "$SRC_COUNT" ]; then
+        UNTESTED=$((SRC_COUNT - TEST_COUNT))
+        emit "TESTGAP-01" "warn" "$UNTESTED" "$UNTESTED source files changed without corresponding test changes" "$(printf '%s\n' "$CHANGED_SRC" | head -20)"
+    else
+        emit "TESTGAP-01" "pass" "0" "Source changes have matching test changes"
+    fi
+else
+    emit "TESTGAP-01" "info" "0" "Test gap detection skipped (no .git or coverage data)"
+fi
+
+# ============================================================
+# GROUP J: Performance Checks (route to Performance Agent)
 # ============================================================
 
 # PERF-01: [description]
@@ -142,10 +270,14 @@ fi
 # Close JSON and output
 # ============================================================
 
-echo '' >> "$RESULTS_FILE"
-echo '}' >> "$RESULTS_FILE"
-
-cat "$RESULTS_FILE"
+python3 -c '
+import json, sys
+out = {}
+for line in open(sys.argv[1]):
+    r = json.loads(line)
+    out[r.pop("id")] = r
+print(json.dumps(out, indent=2))
+' "$RESULTS_FILE"
 ```
 
 ## Check ID Convention
@@ -172,7 +304,7 @@ The check-ID prefix is the routing key: the skill splits the preflight JSON by p
 "SEC-04": { "name": "POST forms without CSRF", "agent": "security", "status": "fail", "count": 2, "files": ["app/views/x.php:12", "app/views/y.php:40"] }
 ```
 
-That way the dispatcher can route on the field directly and the JSON is self-documenting. A top-level `"status"` (`pass`/`warn`/`fail`) summarizing the worst check is also useful for a fast gate.
+That way the dispatcher can route on the field directly and the JSON is self-documenting. A top-level `"status"` summarizing the worst check is also useful for a fast gate, provided `error` ranks as unknown rather than below `pass`.
 
 ## Canary Self-Test: prove every check can fire
 
@@ -365,7 +497,7 @@ Each check carries its verified count and the date it was verified, in a comment
 A bare count is ambiguous. `0` means the tree is clean, or the check is dead, or the scan was pointed at a directory holding none of the target language. A count with a baseline is a comparison, and comparisons carry information:
 
 - `baseline 0` reporting 0: the check passed. This is the whole gain, and it is the reason a fail-gating check needs a baseline before it can gate.
-- `baseline 10` reporting 10: known debt, already triaged. Not a finding, do not re-file it.
+- `baseline 10` reporting 10: no net change, which is not the same as no new violation. Fix one old hit and add one new one and the count stays 10. A count gate is a summary; for a check carrying debt, keep the triaged hit list beside the count (`path` plus a stable anchor such as the matched text or enclosing function, not the line number, which moves) and diff the sets. A hit outside the triaged set is a new violation whatever the count says; a renamed or moved file is matched on its anchor before it is called new.
 - `baseline 10` reporting 11: one new violation. Report it.
 - `baseline 10` reporting 3: either seven were fixed or the check stopped seeing them. These are indistinguishable from the output, which is why the drop has to be verified rather than assumed.
 
