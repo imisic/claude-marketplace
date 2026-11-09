@@ -22,6 +22,8 @@ You start the generators yourself. They write files in your project: a review sk
 
 Whole-tree reviews also read everything changed since the last review, line by line. This helps them catch new bugs that the existing checklists may miss.
 
+At the deeper review levels, every serious finding triggers a search for the same root cause elsewhere in the code, and a final pass lists the entry points nobody read, so an empty report can't hide unreviewed code.
+
 Dismissed findings are recorded with the reason they were dismissed. That reason becomes an exception in the review skill, and a pattern dismissed again and again points to a check that needs narrowing. When a pattern keeps returning after a rule or check was added for it, `a-self-learner` treats the existing defense as failing and proposes enforcement rather than another rule.
 
 The automated checks fail when one of them crashes, and an empty result counts as zero. `a-rules-optimizer` never recommends `alwaysApply`, a Cursor setting Claude Code ignores, and dates each rule file it audits so an outdated one is visible.

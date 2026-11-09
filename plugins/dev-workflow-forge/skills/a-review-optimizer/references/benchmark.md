@@ -8,7 +8,7 @@ The problem it solves: this skill rewrites another skill and then hands it back 
 
 | Path | What it is |
 |-|-|
-| `benchmarks/corpus.json` | 22 defects, 11 PHP and 11 Python, each one a real past finding mined from the author's project review logs |
+| `benchmarks/corpus.json` | 22 defects, 11 PHP and 11 Python, each one modeled on a real past review finding, with project names made generic |
 | `scripts/seed-defects.py` | The harness: list, plant, verify, score, restore. Standard library only, no venv |
 | `benchmarks/test-guards.sh` | Regression test for the harness: asserts every guard refuses, exits 1 if one stops refusing |
 

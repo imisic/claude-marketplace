@@ -21,11 +21,11 @@ The bundled fetcher requires Python 3 and `openssl` on macOS, Linux, or WSL. On 
 1. `console.cloud.google.com` → pick or create a project.
 2. APIs & Services → Library → **Google Search Console API** → Enable. Skipping this returns a 403 from the query endpoint whose wording sounds like a permissions problem rather than a disabled API.
 3. APIs & Services → Credentials → Create credentials → **Service account**. No project IAM roles are needed; property access is granted in Search Console, not in IAM.
-4. Open it → **Keys** → Add key → Create new key → **JSON**. Save it outside any webroot at `~/.config/gsc/<property-slug>.json`, mode 600. The slug is the property with `:`, `/` and `.` turned into `-`, so `sc-domain:example.com` becomes `example-com`.
+4. Open it → **Keys** → Add key → Create new key → **JSON**. Save it outside any webroot and any repository (for example `~/.config/gsc/example-com.json`), mode 600, then enter that path in the plugin's **Search Console key file** setting (`/plugin configure`).
 
-**Per property:** Search Console → Settings → Users and permissions → Add user → the service account's `...iam.gserviceaccount.com` address → **Restricted**. The query endpoint needs read permission, so Full is unnecessary. One service account can be granted access to several properties; pass the same key with `--key` or `GSC_SERVICE_ACCOUNT_JSON` when its default filename belongs to another property.
+**Per property:** Search Console → Settings → Users and permissions → Add user → the service account's `...iam.gserviceaccount.com` address → **Restricted**. The query endpoint needs read permission, so Full is unnecessary. One service account can be granted access to several properties; the one configured key file then works for all of them.
 
-**What the API cannot give you, ever:** the Index Coverage report (exports 2 and 3 below) and the Links report. There is no endpoint for either. The URL Inspection API is not a substitute for coverage: it only answers for URLs you hand it, so it can confirm a sitemap but can never reveal index bloat from URLs Google holds that you never submitted, which is half of what that report is for.
+**What the API cannot give you (as of 2026-11):** the Index Coverage report (exports 2 and 3 below) and the Links report. There is no endpoint for either. The URL Inspection API is not a substitute for coverage: it only answers for URLs you hand it, so it can confirm a sitemap but can never reveal index bloat from URLs Google holds that you never submitted, which is half of what that report is for.
 
 ## The three core exports
 
@@ -37,7 +37,7 @@ Open [search.google.com/search-console](https://search.google.com/search-console
 3. Make sure the four metric toggles are all on: **Total clicks, Total impressions, Average CTR, Average position**.
 4. Click **Export** (top right) → **Download CSV** (a zip).
 
-This zip contains: `Queries.csv`, `Pages.csv`, `Countries.csv`, `Devices.csv`, `Dates.csv` (or `Chart.csv`), `Filters.csv`, `Search appearance.csv`. Note: the Queries and Pages files are a top-N sample (~1000 rows), not every query, so query-level totals are a sample, not the site total. The Dates/Chart file carries the true totals.
+This zip usually contains (Google changes file names and headers now and then): `Queries.csv`, `Pages.csv`, `Countries.csv`, `Devices.csv`, `Dates.csv` (or `Chart.csv`), `Filters.csv`, `Search appearance.csv`. Note: the Queries and Pages files are a top-N sample (~1000 rows), not every query, so query-level totals are a sample, not the site total. The Dates/Chart file carries the true totals.
 
 ### 2. Indexing summary (Pages)
 1. Left nav → **Indexing** → **Pages**.
@@ -48,7 +48,7 @@ Gives the indexed vs not-indexed counts over time (`Chart.csv`) and the reason b
 ### 3. Indexing drilldown (the one people skip)
 1. Still in **Indexing → Pages**, scroll to "Why pages aren't indexed".
 2. Click the largest reason (usually **Crawled - currently not indexed**, or **Discovered - currently not indexed**, or **Duplicate without user-selected canonical**).
-3. On the detail page, click **Export**. This gives `Table.csv` (`URL,Last crawled`), the actual list of affected URLs.
+3. On the detail page, click **Export**. This gives `Table.csv` (`URL,Last crawled`), an example list of affected URLs, capped at 1,000 and not guaranteed complete.
 4. Repeat for any other reason with a meaningful count.
 
 The drilldown is what turns "44 pages aren't indexed" into "these specific 44 URLs, and here's the pattern." Without it the analysis is guesswork.
@@ -65,7 +65,8 @@ A single export is a snapshot: it cannot show "position improved but CTR dropped
 
 | Report | Where | Adds |
 |--------|-------|------|
-| **Links** | Left nav → Links → Export | Top linking sites, top linked pages, internal links. Reveals authority and orphan pages. |
+| **Links** | Left nav → Links → Export | Top linking sites, top linked pages, internal links. A sample: shows authority, but a missing page is not proof of an orphan. |
+| **Search generative AI** | Performance → Search generative AI | AI Overviews and AI Mode impressions by page, country, device and date (no clicks). No API; screenshot or read off. |
 | **Sitemaps** | Indexing → Sitemaps | Submitted vs discovered counts; sitemap errors. |
 | **Core Web Vitals** | Experience → Core Web Vitals | Slow-URL groups (LCP/CLS/INP). CWV code fixes belong to a performance or technical-SEO skill, not here. |
 | **Enhancements / Structured data** | Experience/Enhancements | Which rich-result types are eligible and erroring. |

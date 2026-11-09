@@ -1,5 +1,13 @@
 # search-visibility changelog
 
+## 1.5.0
+
+**Setup change for the API route.** The Search Console key file is now a plugin setting, **Search Console key file**, that you fill in once (or later with `/plugin configure`). The fetcher reads only that path. It no longer checks the `GSC_SERVICE_ACCOUNT_JSON` environment variable or `~/.config/gsc/` on its own, so if you relied on either, enter the path in the setting.
+
+`a-seo-gsc` is refreshed for Search Console and GA4 as of November 2026. It reads the new Search generative AI report (AI Overviews and AI Mode impressions), warns when a fetch hits Google's roughly 50,000-rows-per-day cap, handles Discover and Google News correctly (they have no query data), and stops recommending FAQ and HowTo rich results, which Google retired. Several diagnoses are worded as the hypotheses they are rather than as rules.
+
+`a-geo-optimizer` has current vendor facts for every AI crawler (checked 2026-11-08), robots.txt templates that repeat the shared Disallow lines in named groups (named groups don't inherit them), Google's Search generative AI control, Bing's AI Performance report, the GA4 AI Assistant channel, content signals, and Markdown delivery for agents. Unsourced statistics were removed and the probe checks the named-group mistake.
+
 ## 1.4.0
 
 `a-geo-optimizer` gains `scripts/geo_probe.py`, a deterministic first pass over robots.txt (per AI crawler), `llms.txt`, JSON-LD blocks and head tags. It reports evidence with a severity and exits non-zero when anything at or above `--severity` is found, so the audit starts from a candidate set instead of hand-fetching, and the model spends its reading on what a script cannot judge. Stdlib only, no network in its tests.

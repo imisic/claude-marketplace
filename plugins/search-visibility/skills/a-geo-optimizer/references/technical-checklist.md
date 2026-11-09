@@ -24,7 +24,7 @@ Complete technical implementation guide. Work through sequentially for new build
 
 **Priority: CRITICAL. This is a binary gate**
 
-Most AI crawlers (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot) do NOT execute JavaScript. Analysis of 500M+ GPTBot fetches showed zero JS execution. Only Googlebot reliably renders JS.
+The major AI crawlers (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot) do not execute JavaScript: Vercel and MERJ's 2024 analysis of their fetches found no JS rendering. Googlebot and Applebot render JS, and agentic browsers run full pages, but content that only exists after JS runs is invisible to the bots that feed ChatGPT, Claude and Perplexity. Server-rendered HTML remains the safe default.
 
 **Audit check:**
 ```bash
@@ -48,58 +48,11 @@ curl -s -A "GPTBot" https://yoursite.com/page | grep -c "your-expected-content"
 
 ## 2. Robots.txt Configuration
 
-**Priority: CRITICAL. Blocking crawlers = invisible to AI**
+**Priority: CRITICAL. Blocking a search/index bot removes the site from that assistant's answers**
 
-See `crawler-reference.md` for complete user-agent list. Here's the recommended robots.txt template:
-
-```
-# === Standard Search Crawlers ===
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-# === AI Search Crawlers (allow for search visibility) ===
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: Claude-SearchBot
-Allow: /
-
-User-agent: Claude-User
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-# === AI Training Crawlers (optional, allow if you want to be in training data) ===
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-# === Block paths that shouldn't be crawled ===
-User-agent: *
-Disallow: /admin/
-Disallow: /api/
-Disallow: /tmp/
-Disallow: /private/
-
-Sitemap: https://yoursite.com/sitemap.xml
-```
-
-**Important distinctions:**
-- **Search crawlers** (OAI-SearchBot, Claude-SearchBot, ChatGPT-User, Claude-User, PerplexityBot): These power real-time search features. Blocking them removes you from AI search results.
-- **Training crawlers** (GPTBot, ClaudeBot, Google-Extended): These collect data for model training. Blocking them doesn't affect real-time search but reduces long-term model familiarity with your content. Sites blocking GPTBot were cited 73% less often.
-- ChatGPT-User and Claude-User operate on behalf of human users and may not fully respect robots.txt blocks.
+Templates, the user-agent list and what each bot does are in `crawler-reference.md` sections 1 and 8. Two things to get right:
+- **Named groups don't inherit `User-agent: *`** (RFC 9309). If every bot gets the same rules, use only the `*` group. If a bot gets its own group, repeat every shared Disallow line in it, or it may crawl `/admin/`, `/checkout/` and the rest.
+- **Three kinds of bot.** Search/index bots (OAI-SearchBot, Claude-SearchBot, PerplexityBot, Googlebot, Bingbot) decide whether you appear in AI answers. User-triggered fetchers (ChatGPT-User, Claude-User, Perplexity-User, Google-Agent) load a page because a person asked, and most vendors say they may ignore robots.txt. Training bots and tokens (GPTBot, ClaudeBot, Google-Extended, Applebot-Extended) govern model training, and allowing them is the site owner's call, not a visibility requirement. Google-Extended also controls Gemini app grounding.
 
 **Audit check:**
 ```bash
@@ -112,11 +65,13 @@ curl -s https://yoursite.com/robots.txt
 
 ## 3. Schema.org Structured Data
 
-**Priority: HIGH. GPT-4 accuracy jumps from 16% to 54% with structured data**
+**Priority: HIGH for entities (Organization, Person, Product, LocalBusiness, Article); optional elsewhere**
 
-All schema must be:
-- In JSON-LD format (Google-recommended, easiest for AI to parse)
-- Rendered server-side in the HTML `<head>` (not injected via JS)
+Google says AI Overviews and AI Mode need no special schema; structured data earns Google rich results and states entities unambiguously. No published evidence shows schema itself raising AI citations. (An often-quoted "GPT-4 accuracy 16% to 54%" comes from a knowledge-graph study on enterprise SQL databases, not website markup; don't cite it for schema.)
+
+Schema should be:
+- JSON-LD (Google's recommended format; Microdata and RDFa also work)
+- In the server-rendered HTML, so non-JS AI crawlers see it; `<head>` or body both work
 - Accurately matching visible page content (mismatches reduce trust)
 
 ### Schema templates by page type
@@ -176,7 +131,7 @@ All schema must be:
 }
 ```
 
-**FAQPage (powerful for AI extraction):**
+**FAQPage (optional):** Google stopped showing FAQ rich results on 2026-05-07; the markup is still valid but earns nothing visible in Google. Keep a visible Q&A section when readers ask those questions; add the schema only if it's free to generate.
 ```json
 {
   "@context": "https://schema.org",
@@ -227,7 +182,7 @@ All schema must be:
 }
 ```
 
-**HowTo (for tutorials/guides):**
+**HowTo (optional; Google dropped HowTo rich results in 2023):**
 ```json
 {
   "@context": "https://schema.org",
@@ -361,20 +316,20 @@ Optionally create `llms-full.txt`: the same overview followed by the full markdo
 
 **Priority:** LOW / optional. Future-proofing, not a required output.
 
-**Current status (as of 2026-07, per third-party trackers, not primary sources; verify before quoting):** Adoption is growing but uneven (roughly 10% of large domain samples). Some providers have confirmed support (Anthropic by late 2024, Perplexity by 2025), and by 2026 most major Western AI platforms offer partial support. The most concrete, verifiable adoption is in AI dev tools: Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, Aider all fetch `/llms.txt` and `/llms-full.txt`, especially for documentation/reference sites. Google has said it does not use llms.txt for Search, and as of Q1 2026 no major AI provider (OpenAI, Google, Anthropic, Meta, Mistral) has publicly committed to reading it in production answer systems. What HAS changed: Google now validates the file in Lighthouse and PageSpeed Insights (Agentic Browsing category, section 13), which makes it a visible pass/fail checkbox for clients, tools, and audits. Bottom line: still don't prioritize it over robots.txt, schema, sitemap, or content structure, but if you ship one, make sure it passes the three Lighthouse checks above.
+**Current status (checked 2026-11-08):** Google's AI optimization guide says Search does not use llms.txt. No major AI provider (OpenAI, Google, Anthropic, Meta, Mistral) has published a statement that its answer systems read customer sites' llms.txt; providers publishing their own llms.txt for their docs is not the same thing. Server-log studies (industry, e.g. Ahrefs) report that most llms.txt files get almost no requests. The real consumers are coding agents and docs tools that fetch it for documentation sites. What did change: Lighthouse and PageSpeed Insights validate the file (section 13), so a malformed one shows as a failed audit. Bottom line: don't prioritize it over robots.txt, content, sitemap or schema; if you ship one, make it pass the three Lighthouse checks. For agents, Markdown content negotiation (`crawler-reference.md` section 13) is the more direct route.
 
 ---
 
 ## 6. Page Speed Optimization
 
-**Priority: HIGH. Pages with FCP < 0.4s get 3× more AI citations**
+**Priority: HIGH**
 
 Target metrics:
-- First Contentful Paint (FCP): < 0.4 seconds
-- Time to First Byte (TTFB): < 200ms
+- Time to First Byte (TTFB): < 200ms (crawlers fetch HTML; this is what they feel)
+- First Contentful Paint (FCP): < 1.8s (Google's "good"); faster is better
 - Largest Contentful Paint (LCP): < 2.5 seconds
 
-AI crawlers abandon slow pages more aggressively than traditional search crawlers.
+An SE Ranking industry study (2025-11) found pages with very fast FCP were cited more by ChatGPT. That is a correlation (fast sites tend to be well-built, authoritative sites), not proof that speed causes citation; don't promise a multiplier. Speed matters regardless because AI fetchers work on tight time budgets and slow or timed-out pages can't be quoted.
 
 Quick wins for PHP sites:
 - Enable OPcache
@@ -394,7 +349,9 @@ Submit your sitemap to both:
 - **Google Search Console**: https://search.google.com/search-console
 - **Bing Webmaster Tools**: https://www.bing.com/webmasters
 
-Bing is critical because ChatGPT and Copilot both use Bing's index. 87% of ChatGPT citations match Bing's top results.
+Bing matters because Copilot runs on it and ChatGPT search draws partly on it (evidence and limits in `crawler-reference.md` section 6). Both consoles now report AI visibility: Google's Generative AI performance report and Bing's AI Performance report (citations and grounding queries). Turn both on; they are the only first-party AI numbers available.
+
+In Google Search Console, also check Settings > Search generative AI. It should be on Include (the default); Exclude removes the site from AI Overviews and AI Mode.
 
 ---
 
@@ -402,7 +359,7 @@ Bing is critical because ChatGPT and Copilot both use Bing's index. 87% of ChatG
 
 **Priority: MEDIUM-HIGH**
 
-IndexNow instantly notifies Bing (and by extension ChatGPT/Copilot) when content is published or updated.
+IndexNow instantly notifies Bing (and so Copilot) and other participating engines when content is published or updated. Google does not use IndexNow.
 
 ```php
 // After publishing or updating content
@@ -436,7 +393,7 @@ If you write content in Markdown (e.g., from Obsidian, a CMS, or a static site g
 <link rel="alternate" type="text/markdown" href="/blog/post-slug.md" />
 ```
 
-AI models process Markdown natively. This gives them a clean, uncluttered version of your content.
+AI models process Markdown natively. This gives them a clean, uncluttered version of your content. Stronger option: answer `Accept: text/markdown` requests with the Markdown version directly (content negotiation, with `Vary: Accept`), which some agents already send; see `crawler-reference.md` section 13. Either way, the Markdown must say the same thing as the HTML.
 
 ---
 
@@ -469,15 +426,13 @@ All pages must be served over HTTPS. This is a ranking factor for Google/Bing an
 
 ## 12. Internal Linking Architecture
 
-**Priority: HIGH. Pillar-cluster architecture delivers 2.7× citation multiplier**
+**Priority: HIGH**
 
-Structure sites as topic clusters:
-- **Pillar page**: Covers a whole topic end to end (2000+ words)
+Google documents "query fan-out" for AI Overviews and AI Mode: one question is split into several related searches, and the answer draws on pages for each. A site that covers a topic's subquestions on well-linked pages has more chances to be pulled in. Structure sites as topic clusters:
+- **Pillar page**: Comprehensive overview of a topic (2000+ words)
 - **Cluster pages**: Detailed sub-topic articles linking back to pillar
 - **Bidirectional links**: Pillar links to clusters, clusters link to pillar
 - Use descriptive anchor text (not "click here")
-
-82.5% of ChatGPT citations link to pages within established topic hierarchies, not isolated articles.
 
 ---
 
@@ -490,7 +445,7 @@ Chrome Lighthouse (Chrome 150+, also surfaced on pagespeed.web.dev) added an "Ag
 **What it checks:**
 
 1. **llms.txt presence and format**: see section 5 for the three checks (an H1, at least one markdown `[text](url)` link, at least 50 characters).
-2. **WebMCP integration**: WebMCP (Web Model Context Protocol) is a W3C proposal that lets a page expose callable tools to AI agents via `navigator.modelContext` instead of the agent guessing at the UI. Announced February 2026, in Chrome origin trial (Chrome 149-156); the main consuming agent today is Gemini in Chrome. Lighthouse verifies both declarative tools (defined in HTML) and imperative tools (registered from JS). Only relevant for interactive sites (search, cart, booking, filters); content/publishing sites can safely skip it. Reference: https://developer.chrome.com/docs/ai/webmcp
+2. **WebMCP integration**: WebMCP lets a page expose callable tools to AI agents (`document.modelContext.registerTool()` in the current draft) instead of the agent guessing at the UI. It is a Web Machine Learning Community Group draft (2026-11-02), "not a W3C Standard nor … on the W3C Standards Track", and the API has changed between drafts (earlier versions used `navigator.modelContext` and a declarative HTML form that the current draft drops). Chrome runs an origin trial from Chrome 149; the Lighthouse audit only passes with the trial token. Which production agents consume it is not settled; check the spec repo's implementation-status page before promising anything. Only relevant for interactive sites (search, cart, booking, filters); content sites skip it. References: https://developer.chrome.com/docs/ai/webmcp, https://webmachinelearning.github.io/webmcp/
 3. **Agent-centric accessibility subset**: agents drive pages through the accessibility tree, so Lighthouse filters the a11y audits that matter for machine interaction: every interactive element has a programmatic name, ARIA roles are valid and on compatible elements, identical links have the same purpose, touch targets have sufficient size/spacing. Accessibility fixes now double as agent-readiness fixes; pitch them that way.
 4. **Layout stability (CLS)**: agents target elements by position, so layout shift breaks them the same way it annoys humans.
 

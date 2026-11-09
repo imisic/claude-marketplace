@@ -1,5 +1,13 @@
 # dev-workflow-forge changelog
 
+## 1.9.0
+
+Security review works from an invariant instead of a smell. For each candidate the finder names who sends what, which check should stop it, and what ends up wrong; a candidate that can't name the wrong result counts as hardening, not a finding. This catches the check that exists but checks the wrong resource.
+
+Two new steps at higher depth. At `high` and `max`, every confirmed High or Critical finding gets a variant hunt: a fresh agent searches the whole tree for the same root cause elsewhere. At `max`, a coverage critic lists the entry points and parallel paths no agent read, so they are either reviewed or reported as not reviewed.
+
+If Cloudflare's security-audit skill is installed, the security finder is handed its attack-class checklists. These ideas are adapted from that skill (https://github.com/cloudflare/security-audit-skill, MIT). Small wording fixes in the optimizer prompts.
+
 ## 1.8.0
 
 Preflight checks that could not run now say so. A scanner that crashed, or exited for a reason other than finding something, reports `error` instead of `pass`, and the review treats `error` as unknown rather than clean. The JSON comes from a serializer, so a message holding a quote or a newline no longer produces invalid output.

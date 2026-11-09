@@ -22,7 +22,9 @@ Fetching over the API buys more than saved clicks. Search Console's own export c
 
 Need the one-time setup? [The full Search Console API walkthrough](/blog/ai-tools/search-console-api-page-query-pairs) explains the Cloud project, service account, key placement, and page-and-query request. The installed skill still guides the setup one step at a time.
 
-The bundled API fetcher needs Python 3 and `openssl` on macOS, Linux, or WSL. On native Windows, the skill offers WSL or the manual-export route before asking you to create a key.
+The bundled API fetcher needs Python 3 and `openssl` on macOS, Linux, or WSL. On native Windows, the skill offers WSL or the manual-export route before asking you to create a key. The plugin asks for the key file's path once, as a setting, and the fetcher reads only that file.
+
+Version 1.5.0 reads Search Console's new generative AI report, brings every AI crawler and robots.txt template up to date as of November 2026, and drops advice Google no longer supports, such as FAQ rich results.
 
 If you would rather keep downloading CSVs, nothing changes. The fetcher writes Google's own export shapes, so the parser cannot tell the two apart.
 

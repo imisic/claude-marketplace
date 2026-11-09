@@ -4,6 +4,8 @@ How to structure, write, and maintain content that AI systems extract, cite, and
 
 **How to read this file.** It gives direction, not measured effects. Earlier versions quoted citation percentages and multipliers from industry analyses that named no source; they were removed because a figure with no source and no stated limits cannot justify a rule. If you quote a number to a client or on a page, quote one you have checked against a named primary source, with its date, the platforms it measured and its limits.
 
+**Google's position (AI optimization guide, 2026-07):** there are no special optimizations for AI Overviews or AI Mode beyond normal Search; no requirement to break content into small chunks for AI; no ideal length. Treat the patterns below as good writing that also suits extraction, not as eligibility rules.
+
 ## Table of Contents
 
 1. [The Answer-Capsule Format](#1-the-answer-capsule-format)
@@ -28,14 +30,14 @@ How to structure, write, and maintain content that AI systems extract, cite, and
 
 ## 1. The Answer-Capsule Format
 
-The core content pattern for AI citation. Every major section should follow this structure:
+A writing habit that serves readers and extraction alike: open a section with a short, complete answer, then support it. The word counts are a rule of thumb, not a requirement; no vendor names a length.
 
 ```
 [Question-style H2 heading]
 
-[40-60 word direct answer, the "capsule"]
+[Direct answer in a sentence or two, roughly 40-60 words]
 
-[Supporting detail, evidence, examples, 80-120 additional words]
+[Supporting detail, evidence, examples]
 
 [Optional: data table, comparison, or specific example]
 ```
@@ -97,7 +99,7 @@ Each section should be:
 - Bounded by a descriptive heading
 - Complete enough to stand alone as an answer
 
-Articles over 2,900 words average 5.1 citations vs 3.2 for content under 800 words. Longer is better, but only if each section adds genuine value.
+Length follows coverage. A page that answers a topic's real subquestions (Google's AI features split one question into several searches, "query fan-out") tends to be long; padding to hit a word count does not help.
 
 ---
 
@@ -119,7 +121,7 @@ Use question-style headings that mirror how people ask AI assistants.
 - "Our Approach"
 - "More Information"
 
-Also: ChatGPT internally appends intent modifiers like "detailed guide", "step-by-step tutorial", "in-depth comparison" to its search queries. Including these phrases naturally in your headings or opening paragraphs can improve retrieval.
+Also see section 15 on the phrasing assistants use when they search.
 
 ---
 
@@ -173,20 +175,20 @@ AI systems prefer **definitive, authoritative language** over hedging.
 - "Results may vary..."
 - "Contact us to learn more" (dead-end for AI)
 
-**Critical:** AI systems filter out overtly promotional or sales-heavy content. Write as a knowledgeable advisor, not a salesperson. Neutral, factual language with specific claims wins citations.
+Write as a knowledgeable advisor, not a salesperson: neutral, factual language with specific claims is easier to quote than promotion. Specific is not the same as overconfident. Keep real caveats ("for sites under 50 pages", "prices as of 2026-11"); deleting true conditions to sound definitive makes the page wrong, and a wrong page is a liability once an assistant repeats it.
 
 ---
 
 ## 8. FAQ Sections
 
-FAQ sections with question-style headings nearly double citation chances. AI systems extract Q&A pairs directly, especially when paired with FAQPage schema.
+A visible Q&A section answers the follow-up questions readers (and assistants) have, in a form that's easy to quote. Industry studies report FAQ-bearing pages being cited more; those are correlations, so add an FAQ because readers ask the questions, not as a citation trick.
 
 **Requirements:**
 - Use actual questions your customers/readers ask
 - Match the conversational phrasing people use with AI ("How do I..." not "Methodology for...")
 - Each answer direct and complete, as long as the question needs
 - Include the questions readers actually ask, not a set number
-- Pair with FAQPage JSON-LD schema (see technical-checklist.md)
+- FAQPage schema is optional: Google stopped showing FAQ rich results on 2026-05-07 (technical-checklist section 3)
 
 **Good FAQ structure:**
 ```markdown
@@ -241,9 +243,9 @@ Pick the format that fits what your readers are trying to decide, not the one as
 
 ## 11. Author Authority Signals
 
-Cited pages average 4.1 expert quotations vs 2.4 on non-cited pages.
+Clear authorship helps readers judge a page and gives assistants an entity to attach claims to. No vendor documents a citation boost from author markup itself, so treat this as trust-building, not a ranking switch.
 
-For every content page, include:
+For content pages where a person's expertise matters, include:
 - Author name and photo
 - Professional title/role
 - Years of experience or credentials
@@ -312,7 +314,7 @@ Active profiles on the platforms your audience actually uses matter more than a 
 
 ## 15. Intent Modifier Phrases
 
-ChatGPT appends modifier phrases to internal search queries when users ask questions. Including these naturally in your content improves retrieval:
+Assistants rewrite a user's question into one or more search queries before retrieving pages (Google documents this as query fan-out). Practitioners report modifier phrases like these in the rewritten queries; no vendor publishes the list, so treat it as a heuristic for wording headings and openings where they fit:
 
 - "detailed guide"
 - "step-by-step tutorial"
@@ -355,13 +357,14 @@ AI systems pick up corrections faster from multiple independent sources than fro
 
 - **Sales copy and promotional language**: AI filters out overtly commercial content
 - **Vague, hedging language**: "It depends" answers get skipped in favor of specific ones
-- **Thin content under 500 words**: Rarely provides enough value for citation
-- **AI-generated content at scale without editorial enhancement**: Produces patterns AI learns to skip
-- **Keyword-stuffed content**: The original GEO research showed keyword stuffing produced zero gains
-- **Content with no original information**: If AI can generate the same content itself, it won't cite you
+- **Thin content**: pages that don't fully answer their question (a short page that does answer it is fine)
+- **AI-generated content at scale without editorial enhancement**: produces patterns AI learns to skip
+- **Keyword-stuffed content**: the original GEO research showed keyword stuffing produced zero gains
+- **Content with no original information**: if AI can generate the same content itself, it won't cite you
 - **Content behind login walls**: AI crawlers cannot access paywalled content
-- **Information scattered across multiple thin pages**: Consolidate into one page that covers the whole topic
-- **Timestamp-only refreshes**: Changing the date without substantive updates doesn't fool AI systems
+- **Different content for agents than for humans**: a Markdown or llms.txt version that makes claims the HTML page doesn't is cloaking
+- **Information scattered across multiple thin pages**: consolidate into one page that covers the whole topic
+- **Timestamp-only refreshes**: changing the date without substantive updates doesn't fool AI systems
 - **Ignoring a platform**: different assistants cite different sources; optimize for all
 
 **The Chegg lesson:** If your content is commodity information that AI can generate independently, you'll be displaced. Content must include what AI cannot replicate: original data, proprietary research, real case studies with specific metrics, expert quotes from named professionals, and first-person experience.

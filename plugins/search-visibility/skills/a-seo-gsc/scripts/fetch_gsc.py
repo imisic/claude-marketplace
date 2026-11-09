@@ -15,7 +15,8 @@ What this CANNOT fetch, because no API serves it:
   - the Links report. No API at all.
 
 What it fetches that the standard exports do not give you:
-  - page+query PAIRS across the whole property. Google's standard export
+  - page+query PAIRS across the property (up to Google's ~50k rows/day cap,
+    top rows by clicks, so a large site loses its low-click long tail). Google's standard export
     lists queries and pages in separate tables, and a page-filtered export
     covers one page at a time, so a site-wide "which of my pages share this
     query" check is impractical from exports. Shared queries are candidates
@@ -29,8 +30,8 @@ Usage:
     python3 fetch_gsc.py --property sc-domain:example.com --no-compare
 
 Auth is a Google service account with the Search Console API enabled, added as
-a user on the property. Key file resolution, in order: --key, then
-$GSC_SERVICE_ACCOUNT_JSON, then ~/.config/gsc/<property-slug>.json.
+a user on the property. The key file is passed explicitly with --key; the
+script never looks for credentials in the environment or in default paths.
 
 Standard library only, like parse_gsc.py. On Unix-like systems, RS256 is signed
 by shelling out to openssl rather than pulling in google-auth or cryptography.
@@ -58,6 +59,11 @@ SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
 
 # Google's per-request cap. Paginated past with startRow.
 ROW_LIMIT = 25000
+# Google exposes at most about 50,000 rows per day per search type, sorted by
+# clicks. A dataset at or past this many rows has probably lost its long tail.
+DAILY_ROW_CAP = 50000
+# Discover and Google News have no query dimension (and no position).
+NO_QUERY_TYPES = {"discover", "googleNews"}
 # Runaway guard, not a real limit: 40 pages is a million rows.
 MAX_PAGES = 40
 
@@ -280,7 +286,16 @@ def fetch_window(prop: str, token: str, start: str, end: str, outdir: str,
     os.makedirs(outdir, exist_ok=True)
     counts: dict[str, int] = {}
     for filename, dimensions, first_header in DATASETS:
+        if search_type in NO_QUERY_TYPES and "query" in dimensions:
+            stale = os.path.join(outdir, filename)
+            if os.path.exists(stale):
+                os.remove(stale)  # a leftover Web file would be read as this type's queries
+            continue
         rows = query_api(prop, token, dimensions, start, end, search_type)
+        if len(rows) >= DAILY_ROW_CAP:
+            eprint(f"         {filename}: {len(rows)} rows. Google exposes about 50k rows per day "
+                   "per search type, so a site this size may be missing low-click rows; fetch "
+                   "per day or use the BigQuery export to be sure")
         counts[filename] = write_csv(
             os.path.join(outdir, filename), dimensions, first_header, rows
         )
@@ -303,18 +318,12 @@ def property_slug(prop: str) -> str:
     )
 
 
-def resolve_key_path(explicit: str | None, prop: str) -> str:
-    for candidate in (
-        explicit,
-        os.environ.get("GSC_SERVICE_ACCOUNT_JSON"),
-        os.path.expanduser(f"~/.config/gsc/{property_slug(prop)}.json"),
-    ):
-        if candidate and os.path.isfile(candidate):
-            return candidate
+def resolve_key_path(explicit: str) -> str:
+    if explicit and os.path.isfile(explicit):
+        return explicit
     raise SystemExit(
-        "No service-account key found. Pass --key PATH, set "
-        "GSC_SERVICE_ACCOUNT_JSON, or put the JSON at "
-        f"~/.config/gsc/{property_slug(prop)}.json"
+        f"No service-account key at {explicit!r}. Pass --key with the path to the "
+        "JSON Google issued (the plugin's Search Console key file setting)."
     )
 
 
@@ -325,7 +334,7 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=90, help="Window length in days (default 90)")
     ap.add_argument("--end", default="",
                     help=f"Last day, YYYY-MM-DD (default: today minus {LAG_DAYS} days)")
-    ap.add_argument("--key", default=None, help="Service-account JSON path")
+    ap.add_argument("--key", required=True, help="Service-account JSON path")
     ap.add_argument("--out", default="", help="Output directory (default: ./gsc-<slug>-<end>)")
     ap.add_argument("--search-type", default="web",
                     choices=["web", "image", "video", "news", "discover", "googleNews"])
@@ -346,8 +355,9 @@ def main() -> int:
     prev_end = start - dt.timedelta(days=1)
     prev_start = prev_end - dt.timedelta(days=args.days - 1)
 
-    outroot = args.out or f"./gsc-{property_slug(args.property)}-{end.isoformat()}"
-    key = load_key(resolve_key_path(args.key, args.property))
+    type_suffix = "" if args.search_type == "web" else f"-{args.search_type}"
+    outroot = args.out or f"./gsc-{property_slug(args.property)}-{end.isoformat()}{type_suffix}"
+    key = load_key(resolve_key_path(args.key))
     token = access_token(key)
 
     eprint(f"Property: {args.property}  ({key['client_email']})")

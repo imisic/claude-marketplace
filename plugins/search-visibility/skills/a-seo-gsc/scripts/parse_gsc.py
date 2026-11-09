@@ -42,8 +42,9 @@ import sys
 import tempfile
 import zipfile
 
-# Rough organic CTR-by-position reference (desktop+mobile blended, 2023-2024
-# industry averages). Used only to flag snippet underperformance, not as truth.
+# Rough organic CTR-by-position reference (desktop+mobile blended, no single
+# named source, set before AI Overviews were common). Used only to flag
+# snippet underperformance, not as truth.
 EXPECTED_CTR = {
     1: 0.275, 2: 0.150, 3: 0.100, 4: 0.070, 5: 0.055,
     6: 0.043, 7: 0.034, 8: 0.028, 9: 0.024, 10: 0.021,
@@ -650,6 +651,10 @@ def main() -> int:
         )
     elif kept_type:
         print(f"note: search type '{kept_type}'.", file=sys.stderr)
+    if kept_type in ("discover", "googlenews"):
+        print(f"note: '{kept_type}' has no query or position data. Ignore the query, branded "
+              f"and position sections; only clicks, impressions and CTR by page mean anything.",
+              file=sys.stderr)
 
     report = _ingest(csvs)
     if not (report.queries or report.pages or report.coverage_issues or report.not_indexed):

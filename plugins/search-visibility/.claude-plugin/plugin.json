@@ -2,7 +2,7 @@
   "name": "search-visibility",
   "displayName": "Search Visibility: SEO and AI Search",
   "description": "For website owners and marketers: turn Google Search Console data into a ranked list of SEO fixes, and check whether AI assistants can find, read and cite your site.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": {
     "name": "Ivan Misic",
     "url": "https://ivanmisic.net"
@@ -24,5 +24,12 @@
   "documentationUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/search-visibility#readme",
   "privacyPolicyUrl": "https://github.com/imisic/claude-marketplace/tree/main/plugins/search-visibility#privacy",
   "supportUrl": "https://github.com/imisic/claude-marketplace/issues",
-  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE"
+  "termsOfServiceUrl": "https://github.com/imisic/claude-marketplace/blob/main/LICENSE",
+  "userConfig": {
+    "gsc_key_file": {
+      "type": "file",
+      "title": "Search Console key file",
+      "description": "Path to the Google service-account JSON key that the Search Console fetcher uses. Leave it empty if you export reports by hand instead."
+    }
+  }
 }

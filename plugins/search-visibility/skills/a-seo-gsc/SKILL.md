@@ -20,7 +20,7 @@ The output is a doc: `docs/seo/YYYY-MM-DD-action-plan.md` in the target project 
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/skills/a-seo-gsc/scripts/fetch_gsc.py" \
-    --property sc-domain:example.com --days 90
+    --key "${user_config.gsc_key_file}" --property sc-domain:example.com --days 90
 ```
 
 That writes `current/` and `previous/` directories of CSVs in Google's own export shape. If the property has no service-account key yet, do not hand them a link. Run Setup mode below.
@@ -30,7 +30,7 @@ Then ask for the two reports no API serves:
 > Two exports I cannot fetch, both from **Indexing → Pages**:
 > 1. Click **Export** on the summary. That gives the indexed vs not-indexed counts and the reason breakdown.
 > 2. Click the biggest "not indexed" reason (usually "Crawled - currently not indexed"), then **Export** the URL table. Repeat for any other large reason. This is the one people skip and the most useful file in the set.
-> Drop the zips in a folder next to the fetched data. Optional extras: the **Links** report (top linking sites, also no API), **Sitemaps**, and **Core Web Vitals**.
+> Drop the zips in a folder next to the fetched data. Optional extras: the **Links** report (top linking sites, also no API), **Sitemaps**, **Core Web Vitals**, and a screenshot or reading of **Performance → Search generative AI** (AI Overviews and AI Mode impressions; no API serves it).
 
 ### Route B: no API, or they would rather click
 
@@ -40,11 +40,11 @@ Give them this in full. Do not redirect them to a reference file.
 > 1. **Performance → Search results**, set the date range (**Last 3 months** at minimum; if you can, also use the **Compare** tab against the previous period so I can see trends). Click **Export**.
 > 2. **Indexing → Pages**, click **Export** on the summary (the indexed vs not-indexed counts and the reason breakdown).
 > 3. **Indexing → Pages → click the biggest "not indexed" reason** (usually "Crawled - currently not indexed") **→ Export** the URL table. Repeat for any other large reason. This is the one people skip, and it is the most useful file.
-> Drop all the zips in a folder and point me at it. Optional extras: the **Links** report, **Sitemaps**, and **Core Web Vitals**.
+> Drop all the zips in a folder and point me at it. Optional extras: the **Links** report, **Sitemaps**, **Core Web Vitals**, and the **Search generative AI** performance report (AI Overviews and AI Mode impressions).
 
 Everything downstream is identical. The parser cannot tell a fetched directory from an exported zip, and every analysis runs the same way on either.
 
-**Say plainly what route B costs**, once, without labouring it: page+query pairs across the whole property. The standard export lists queries and pages separately; a page-filtered export shows one page's queries at a time, which does not scale to a site-wide check. Without pairs, the shared-query section is omitted rather than reported as clean. Every other dimension is unaffected. That is the whole difference, and for a small site it is often not worth setting up an API to get.
+**Say plainly what route B costs**, once, without labouring it: page+query pairs across the whole property. The standard export lists queries and pages separately; a page-filtered export shows one page's queries at a time, which does not scale to a site-wide check. Without pairs, the shared-query section is omitted rather than reported as clean. The API also returns more rows than the UI's roughly 1,000-row tables, though both are capped samples on large sites. For a small site the difference is often not worth setting up an API to get.
 
 Then ask for the site's **brand terms** (name, domain, product names) so branded vs non-branded traffic can be split, and what the site is **for** (blog, ecommerce, SaaS, docs, local business) so the playbook adapts.
 
@@ -63,11 +63,11 @@ Analyze and Plan usually run together. Do not skip Plan: the written, prioritize
 
 ## Setup mode
 
-Ask for the property exactly as Search Console names it, then resolve the key the same way `fetch_gsc.py` does: an explicit `--key` path, `GSC_SERVICE_ACCOUNT_JSON`, or `~/.config/gsc/<property-slug>.json`. Only skip setup when one of those resolves for the requested property. Do not skip because another JSON file happens to exist in `~/.config/gsc/`.
+Ask for the property exactly as Search Console names it. The key path comes only from the plugin's **Search Console key file** setting, which the Route A command passes as `--key`; the fetcher never searches the environment or default folders. The configured path is: `${user_config.gsc_key_file}`. If that is empty or still shows the `user_config` placeholder, the setting is unset: run setup, then have the user enter the key's path with `/plugin configure` for this plugin and start the skill again. Skip setup only when the configured path exists and that service account has access to the requested property.
 
 Before creating a key, identify the environment and check for Python 3 and `openssl`. The bundled API fetcher needs a Unix-like environment because its secure key handoff uses `/dev/fd`. On native Windows, offer WSL or Route B before walking through setup. If they are setting up the API for their own Windows-capable script, continue and let that script define its credential location.
 
-One service-account key can be reused for several properties, but its account must be added to each property. When reusing one key, pass its path with `--key` or set `GSC_SERVICE_ACCOUNT_JSON`; the property-derived default filename is for zero-argument lookup, not a second key requirement.
+One service-account key can be reused for several properties, but its account must be added to each property. The same configured key file then serves every property it was added to.
 
 Read `references/export-guide.md` and walk them through its setup section **one step at a time, waiting after each**. Do not paste seven steps at once. This is a browser flow across two Google products and people get stuck at a single step, usually the one they think is a formality.
 
@@ -117,15 +117,15 @@ See `references/competitor-analysis.md`. Identify who ranks for the site's strik
 ## Principles
 
 1. **Impressions are not the same as the right audience.** A page can soak up impressions from a query cluster that has nothing to do with the site's purpose. Growing that is vanity. Always sanity-check whether the winning queries match who the site is for.
-2. **Index-starvation vs index-bloat are opposite problems with opposite fixes.** Starvation (good pages not indexed): fix authority, internal linking, and request indexing; do NOT publish more. Bloat (thin/duplicate pages diluting crawl): consolidate, noindex, canonicalize. The parser flags which one the data shows. Never prescribe "write more content" for a starved site.
-3. **Authority is usually the real gate on a small site.** If only backlinked pages get indexed and rank while internally-linked-only pages sit in "crawled, currently not indexed," the bottleneck is authority and link architecture, not content volume. One earned link often does more than ten new posts.
-4. **CTR far below the position curve = a snippet or intent problem, not a ranking problem.** A page at position 9 with 0% CTR usually means the title/meta does not match the query intent, or a SERP feature is eating the click. Fix the snippet, not the ranking.
+2. **Index-starvation vs index-bloat are opposite problems with opposite fixes.** Starvation (good pages not indexed): check canonicals, rendering and server responses first, then authority, internal linking and requesting indexing; do NOT publish more. Bloat (thin/duplicate pages diluting crawl): consolidate, noindex, canonicalize. The parser's ratio flag is a hint, not a diagnosis: legitimate redirects, duplicates and exclusions inflate it. Never prescribe "write more content" for a starved site.
+3. **Authority is often the real gate on a small site** (a working hypothesis, not a Google statement). If only backlinked pages get indexed and rank while internally-linked-only pages sit in "crawled, currently not indexed," suspect authority and link architecture before content volume.
+4. **CTR far below the position curve points to the snippet, intent or the results page, not the ranking.** Before blaming the title, segment by device, country and brand, and check whether an AI Overview, ad block or other feature sits above the result (the Search generative AI report shows whether the page appears in AI features). Only then fix the snippet.
 5. **No controls means self-attributed wins.** Without an untouched comparison set and a dated change log, you cannot prove a fix caused a change. Build the tracking table so the next run can.
 6. **Adapt to the site type.** The failure modes of a 300-page blog, a 50k-SKU store, a docs site, and a local business are different. Read the site-type section of the playbook.
 
 ## Cross-skill boundaries
 
-- **a-geo-optimizer**, AI-search / GEO visibility (ChatGPT, Perplexity, Gemini citations, llms.txt, answer-capsule content). Use it for the AI-discoverability angle; this skill does not duplicate it.
+- **a-geo-optimizer**, AI-search / GEO visibility (ChatGPT, Perplexity, Gemini citations, robots.txt AI rules, Search Console's generative AI setting). Use it for the AI-discoverability angle; this skill only reads the Search generative AI performance numbers.
 - **A project-specific technical-SEO skill**, where you have one, audits the *codebase* (meta tags, canonicals, structured data, CWV). This skill diagnoses from *data* and tells that one what to go fix. Run this to find the problem, the code-level skill to fix it.
 
 `fetch_gsc.py` saves raw exports locally and sends requests only to `oauth2.googleapis.com` and `www.googleapis.com`. The bundled parser computes the findings on the user's machine, then Claude reads those findings in the session under the user's Claude Code plan data controls. The plugin adds no telemetry, and the service-account key never leaves the machine or touches disk beyond the file the user points it at.

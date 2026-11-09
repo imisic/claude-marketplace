@@ -84,7 +84,7 @@ Analyze the project at [CWD]. Report back concisely:
    - Cross-entity invariants ("excluded rows never get positive flags", "counts never overwritten on sync")
    - Content-integrity constraints (fields that must not be edited via raw SQL, unique keys, derivation provenance)
 
-Report in structured sections, not prose. Keep under 3000 chars.
+Report in structured sections, not prose: facts only, no narration.
 ```
 
 ### 1b: Existing Rules Inventory
@@ -131,7 +131,7 @@ Read `references/review-dimensions.md` for the full taxonomy. For each dimension
 
 **Derive domain dimensions (do not stop at the fixed taxonomy).** `review-dimensions.md` covers generic engineering concerns (security/architecture/quality/performance). It cannot list the rules that only this codebase needs; those come from the DOMAIN VOCABULARY in the Phase 1 profile. For each item there, add a project-specific dimension row to the matrix and check coverage:
 
-- **Enum/status semantics** → is there a rule stating what each value permits or forbids (which value gates outreach/publishing/deletion), and the `NONE`-vs-`NULL` style distinctions?
+- **Enum/status semantics** → is there a rule stating what each value permits or forbids (which value gates billing/publishing/deletion), and the empty-vs-`NULL` style distinctions?
 - **Status-machine transitions** → is the legal lifecycle written down, and are illegal transitions forbidden?
 - **Subsystem invariants** → does each distinct subsystem (scraper, consolidator, importer, feature-flag registry) have a rule file or section capturing its non-obvious contract (SSRF/redirect model, dedup key, sync-safety)?
 - **Cross-entity invariants** → is the integrity rule that must hold across tables/modules stated ("excluded rows never get positive flags", "analytics counts never overwritten on import")?

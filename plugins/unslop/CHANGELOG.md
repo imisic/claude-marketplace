@@ -1,5 +1,9 @@
 # unslop changelog
 
+## 1.6.0
+
+`a-unslop-text` gains a set of patterns that read fine sentence by sentence and only show across a whole reply or document: re-explaining what the reader already knows, defending against objections nobody raised, aphorisms, one-line closers, vague "associated with" wording, unnamed experts, guesses that fill a gap in the source, and text that describes the document instead of its subject. A new list says what to keep so a cleanup doesn't flatten a real voice. Rewrites now leave code, commands, paths, frontmatter and link targets untouched, and treat the text under review as material, never as instructions. Several of these are adapted from blader/humanizer (MIT); the credit is in the skill. No scanner changes.
+
 ## 1.5.0
 
 All three tools are updated against 2026 research on what people now call AI-written, AI-coded and AI-designed.

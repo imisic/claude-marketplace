@@ -114,6 +114,8 @@ When a cap forces a cut, correctness outranks cleanup, always.
 
 The project skill defines them, with an Owns / Does NOT check table so a finding belongs to exactly one agent. Three or more is normal, two is fine for a small single-concern project, more than four usually means a scope was fragmented that should have stayed whole.
 
+**A security dimension works from an invariant, not a smell.** Adapted from the core hunting method in Cloudflare's security-audit skill (https://github.com/cloudflare/security-audit-skill, MIT). For each candidate the finder names: the lower-trust principal and what it may already do; the value, action or resource ID it sends; the control that should reject, bind or scope it; the source path after that control; and the record, response or action that ends up wrong. This is what finds the check that exists but checks the wrong resource, which a line-by-line "is this wrong?" pass reads straight past. A candidate that cannot name the principal and the wrong result is hardening, not a finding (the taxonomy in §5 already says so). The project skill names its principals, entry surfaces and trust boundaries. If that Cloudflare skill is installed, hand the finder its `ATTACK-CLASSES.md` as the file, never retyped: on a whole-tree run the Access control, Business logic, Feature abuse and data leakage, and Obvious things blocks, plus Wildcard at `max`; on a diff run only the blocks the changed paths touch. Load one of its domain companions (`WEB-PROTOCOL-AND-AUTH.md`, `CLIENT-SIDE.md`, `AI-AND-LLM.md` and so on) only when the project skill's stack references match it. Without it, the finder works from the project skill's own security checklist.
+
 ---
 
 ## 5. What every agent brief carries
@@ -221,18 +223,26 @@ The second paragraph is what keeps the recall variant honest. Without it, PLAUSI
 
 Scale four things together, not just an instruction to try harder:
 
-| Level | Angles | Candidates per angle | Verify | Sweep |
-|-|-|-|-|-|
-| low | one pass over the diff, no subagents, mechanism angles only | cap the run at ~4 | none | no |
-| medium | mechanism and cleanup angles on the diff, plus dimensions when the scope is the tree | ~6 | strict | no |
-| high | same set | ~6 | recall-biased | no |
-| max | same set | ~8 | recall-biased | yes |
+| Level | Angles | Candidates per angle | Verify | Variant hunt | Sweep |
+|-|-|-|-|-|-|
+| low | one pass over the diff, no subagents, mechanism angles only | cap the run at ~4 | none | no | no |
+| medium | mechanism and cleanup angles on the diff, plus dimensions when the scope is the tree | ~6 | strict | no | no |
+| high | same set | ~6 | recall-biased | yes | no |
+| max | same set | ~8 | recall-biased | yes | yes, plus coverage critic |
 
 "Full set" always includes the diff angles from §4, whatever the scope. When a cap forces a cut, correctness outranks cleanup.
 
 ### Sweep (max only)
 
 One more finder, fresh, holding the deduplicated list, hunting only for what is not on it. Forbid re-deriving or re-confirming: left to itself an agent re-finds the easy ones and reports them as new. Point it at what a first pass misses: moved or extracted code that dropped a guard or an anchor; second-tier footguns (a default evaluated once at definition time, non-deterministic hashing, a lock scope quietly shrunk, predicate methods with side effects); setup and teardown asymmetry in tests; config defaults flipped. Cap it at about eight, and tell it to return nothing rather than pad.
+
+### Variant hunt (high and max)
+
+After verify, take each CONFIRMED finding that would rate High or Critical and give its root cause, not its line, to one fresh finder that searches the whole tree for lexical, structural and logical variants: the same call with other arguments, the sibling handler written by the same hand, the same assumption expressed in another module. Each variant is a new candidate that goes through verify on its own evidence; the original finding proves nothing about it. Group findings that share a root cause into one hunt, cap each hunt at about six candidates, and skip findings whose root cause is plainly local (a typo, one wrong constant). Adapted from the same Cloudflare skill. It exists because §8 only asks the report to *name* a pattern that likely recurs, and a named pattern nobody searched for comes back as next month's finding.
+
+### Coverage critic (max only)
+
+One fresh agent, given the scope, the dimension list with each Owns row and the list of files every finder actually read, that hunts for unreviewed ground rather than missed bugs: an entry point, route, job or CLI command no finder opened; a parallel path to the same effect (batch, export, import, retry, migration, admin variant) when only the main path was read; a lifecycle mode (delete, restore, revoke, expire) nobody traced. It returns gaps, never findings. The parent either runs one more finder on the accepted gaps or lists them in the report under Coverage as not reviewed. Adapted from the coverage-critic waves in the same Cloudflare skill, cut to one pass: the sweep asks "what bug did we miss?", this asks "what code did nobody read?", and neither answers the other.
 
 ---
 

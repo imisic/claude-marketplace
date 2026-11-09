@@ -90,7 +90,7 @@ If no existing review skill was found, skip this phase and proceed to Phase 2 to
 
 ## Phase 2: Deep Project Analysis
 
-This is the core of the optimizer. You need to understand the project as well as a senior engineer who's worked on it for 6 months. Don't skim: actually read the code.
+This is the core of the optimizer: the improved skill can only be as project-specific as the code read here.
 
 ### Step 1: Project Profile
 
@@ -416,7 +416,7 @@ Present to the user:
 
 ## When No Review Skill Exists
 
-Building from scratch is fundamentally different from improving an existing skill: plan on **2-3× the time** and expect fewer project-specific insights unless Phase 2 is done deeply. Don't rush Phase 2.
+Building from scratch is fundamentally different from improving an existing skill: plan on **2-3× the time** and expect fewer project-specific insights unless Phase 2 is done deeply.
 
 The from-scratch workflow:
 

@@ -32,17 +32,23 @@ from html.parser import HTMLParser
 # Source of truth for this list: references/crawler-reference.md, section 1 (quick
 # reference table) and section 7 (other AI crawlers). The reference may not ship next to
 # this script, so the tokens are embedded; update both together. Tier decides severity
-# when a crawler is disallowed: "search" powers live answers (blocking removes the site
-# from AI search), "training" only reduces long-term model familiarity, "other" is
-# smaller platforms.
+# when a crawler is disallowed: "search" builds the index AI answers cite (blocking drops
+# the site from those answers), "user" fetches a page when a person asks (vendors say
+# these may ignore robots.txt, so a block is partial), "training" only reduces long-term
+# model familiarity (or, for Google-Extended, Gemini grounding), "other" is smaller
+# platforms.
 CRAWLERS = {
-    "Googlebot": "search", "Bingbot": "search", "OAI-SearchBot": "search", "ChatGPT-User": "search",
-    "Claude-SearchBot": "search", "Claude-User": "search", "PerplexityBot": "search",
+    "Googlebot": "search", "Bingbot": "search", "OAI-SearchBot": "search",
+    "Claude-SearchBot": "search", "PerplexityBot": "search",
+    "ChatGPT-User": "user", "Claude-User": "user", "Perplexity-User": "user", "Google-Agent": "user",
     "GPTBot": "training", "ClaudeBot": "training", "Google-Extended": "training",
-    "cohere-ai": "other", "Bytespider": "other", "Applebot": "other", "Applebot-Extended": "other",
-    "FacebookBot": "other", "meta-externalagent": "other", "Amazonbot": "other", "Timesbot": "other",
+    "Applebot": "other", "Applebot-Extended": "other", "meta-externalagent": "other",
+    "Meta-WebIndexer": "other", "Amazonbot": "other", "Amzn-SearchBot": "other",
+    "MistralAI-Index": "other", "MistralAI-User": "other", "MistralAI-Training": "other",
+    "Amzn-User": "other", "DuckAssistBot": "other",
+    "Bytespider": "other", "cohere-ai": "other",
 }
-TIER_SEVERITY = {"search": "high", "training": "medium", "other": "low"}
+TIER_SEVERITY = {"search": "high", "user": "medium", "training": "medium", "other": "low"}
 
 # Fields per @type, from references/technical-checklist.md section 3 templates and the
 # entity checks in SKILL.md step 2. First tuple is required (missing = medium), second is
@@ -125,8 +131,10 @@ def normalize_target(arg):
 
 def parse_robots(text):
     """Groups of (agent tokens, rules) plus Sitemap and Content-Signal lines. Follows the
-    REP grouping: consecutive User-agent lines share one rule block; a rule line closes
-    the agent list. Comments and blank lines are ignored."""
+    REP grouping: consecutive User-agent lines share one rule block; only an Allow or
+    Disallow line closes the agent list, so an unsupported line between User-agent lines
+    (Crawl-delay, Sitemap) doesn't split the group, as Google's parser treats it. Comments
+    and blank lines are ignored."""
     groups, sitemaps, signals = [], [], []
     agents, rules, collecting = [], [], False
     for raw in text.splitlines():
@@ -143,8 +151,8 @@ def parse_robots(text):
                 collecting = True
             agents.append(val.lower())
             continue
-        collecting = False
         if key in ("allow", "disallow") and agents:
+            collecting = False
             rules.append((key, val))
         elif key == "sitemap":
             sitemaps.append(val)
@@ -155,21 +163,21 @@ def parse_robots(text):
     return groups, sitemaps, signals
 
 
-def _rule_matches_root(path):
+def _rule_matches(path, target):
     # Empty Disallow means "nothing disallowed"; `*` and `$` are the only wildcards.
     if not path:
         return False
     pattern = "^" + re.escape(path).replace(r"\*", ".*")
     if pattern.endswith(r"\$"):
         pattern = pattern[:-2] + "$"
-    return re.match(pattern, "/") is not None
+    return re.match(pattern, target) is not None
 
 
-def root_access(rules):
-    """Longest-match evaluation of `/`; Allow wins ties, as Google and Bing do it."""
+def root_access(rules, target="/"):
+    """Longest-match evaluation of `target` (default `/`); Allow wins ties, as Google and Bing do it."""
     best = None
     for kind, path in rules:
-        if not _rule_matches_root(path):
+        if not _rule_matches(path, target):
             continue
         key = (len(path), kind == "allow")
         if best is None or key > best[0]:
@@ -189,6 +197,26 @@ def crawler_status(groups, token):
         status, rule = root_access(wildcard)
         return {"status": status, "via": "*", "rule": rule}
     return {"status": "unmentioned", "via": None, "rule": None}
+
+
+def named_group_gaps(groups):
+    """{agent: [paths]} the `*` group disallows but the agent's own groups leave open.
+
+    RFC 9309 2.2.1: a crawler obeys only the most specific group naming it, so named groups
+    don't inherit `*` Disallow lines. Compares effective access per path, so Allow
+    precedence, broader rules (`/admin` covers `/admin/`) and repeated groups for one agent
+    count. shortcut: probes the literal Disallow path only (wildcards stripped), not every
+    URL a pattern could match.
+    """
+    star = [r for agents, rules in groups if "*" in agents for r in rules]
+    probes = sorted({p.replace("*", "").rstrip("$") or "/" for k, p in star if k == "disallow" and p})
+    gaps = {}
+    for agent in sorted({a for agents, _ in groups for a in agents if a != "*"}):
+        own = [r for agents, rules in groups if agent in agents for r in rules]
+        open_paths = [t for t in probes if root_access(star, t)[0] == "disallowed" and root_access(own, t)[0] == "allowed"]
+        if open_paths:
+            gaps[agent] = open_paths
+    return gaps
 
 
 def check_robots(origin, timeout, findings):
@@ -234,6 +262,12 @@ def check_robots(origin, timeout, findings):
         if st["status"] == "disallowed":
             findings.append(finding("robots-disallow", TIER_SEVERITY[tier], url,
                                     f"{token} ({tier}) blocked by `{st['rule']}` under User-agent: {st['via']}"))
+    # RFC 9309 2.2.1: a crawler obeys only the most specific group naming it, so a named
+    # group does not inherit the `*` group's Disallow lines. Common template bug: named AI
+    # bots get `Allow: /` while /admin/ etc. sit only under `*`.
+    for agent, open_paths in named_group_gaps(groups).items():
+        findings.append(finding("robots-named-group-skips-wildcard", "low", url,
+                                f"User-agent: {agent} may crawl {', '.join(open_paths)}, which User-agent: * disallows"))
     return data
 
 

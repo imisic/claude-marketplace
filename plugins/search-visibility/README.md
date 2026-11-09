@@ -40,7 +40,7 @@ It adapts to the site type, because a 300-page blog, a 50k-SKU store, a docs sit
 
 For the same setup with an explanation of what each step does, read the [full Search Console API walkthrough](https://ivanmisic.net/blog/ai-tools/search-console-api-page-query-pairs). The installed guide remains complete and walks through the setup without depending on the article.
 
-The bundled API fetcher needs Python 3 and `openssl` on macOS, Linux, or WSL. On native Windows, the skill offers WSL or the manual-export route before asking you to create a key.
+The bundled API fetcher needs Python 3 and `openssl` on macOS, Linux, or WSL. On native Windows, the skill offers WSL or the manual-export route before asking you to create a key. The plugin asks for the key file's path once, as its **Search Console key file** setting (change it later with `/plugin configure`); the fetcher reads only that file and never looks for credentials in your environment.
 
 The fetcher saves the raw exports locally and sends requests only to `oauth2.googleapis.com` and `www.googleapis.com`. The bundled parser computes the findings on your machine, then Claude reads those findings in the session under your Claude Code plan's data controls. The plugin adds no telemetry, and your service-account key never leaves your machine.
 
